@@ -609,14 +609,14 @@ BEGIN
 	 JOIN provincia p on p.nombre = CLIENTE_PROVINCIA
 	 WHERE CLIENTE_LOCALIDAD is not null
 	 and CLIENTE_PROVINCIA is not null)
-     UNION 
-    (SELECT DISTINCT SUPER_LOCALIDAD, p.id_provincia 
+    UNION 
+  (SELECT DISTINCT SUPER_LOCALIDAD, p.id_provincia 
 	FROM gd_esquema.Maestra
 	 JOIN provincia p on p.nombre = SUPER_PROVINCIA
 	 WHERE SUPER_LOCALIDAD is not null
 	 and SUPER_PROVINCIA is not null)
-	UNION 
-    (SELECT DISTINCT SUCURSAL_LOCALIDAD, p.id_provincia
+	  UNION 
+  (SELECT DISTINCT SUCURSAL_LOCALIDAD, p.id_provincia
 	 FROM gd_esquema.Maestra 
 	 JOIN REJUNTESA.provincia p on p.nombre = SUCURSAL_PROVINCIA
 	 WHERE SUCURSAL_LOCALIDAD is not null
@@ -636,11 +636,11 @@ BEGIN
 	FROM gd_esquema.Maestra 
 	WHERE CLIENTE_PROVINCIA is not null)
     UNION 
-    (SELECT DISTINCT SUPER_PROVINCIA
+  (SELECT DISTINCT SUPER_PROVINCIA
 	 FROM gd_esquema.Maestra 
 	 WHERE SUPER_PROVINCIA is not null)
-	UNION 
-    (SELECT DISTINCT SUCURSAL_PROVINCIA
+	  UNION 
+  (SELECT DISTINCT SUCURSAL_PROVINCIA
 	 FROM gd_esquema.Maestra 
 	 WHERE SUCURSAL_PROVINCIA is not null)
 	IF @@ERROR != 0
@@ -649,45 +649,25 @@ BEGIN
 	PRINT('SP PROVINCIA OK!')
 END
 
-CREATE TABLE [REJUNTESA].[cliente] (
-  [id_cliente] int IDENTITY(1,1),
-  [dni] decimal(18,0),
-  [nombre] nvarchar(255),
-  [apellido] nvarchar(255),
-  [domicilio] nvarchar(255),
-  [registro] datetime,
-  [telefono] decimal(18,0),
-  [mail] nvarchar(255),
-  [nacimiento] date,
-  [id_localidad] int,
-  [id_provincia] int,
-  PRIMARY KEY ([id_cliente]),
-  CONSTRAINT [FK_id_localidad_en_cliente.id_localidad]
-    FOREIGN KEY ([id_localidad])
-      REFERENCES [REJUNTESA].[localidad]([id_localidad]),
-  CONSTRAINT [FK_id_provincia_en_cliente.id_provincia]
-    FOREIGN KEY ([id_provincia])
-      REFERENCES [REJUNTESA].[provincia]([id_provincia])
-);
-
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_cliente 
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].cliente(dni, nombre, apellido, domicilio, registro, telefono, mail, nacimiento, id_localidad, id_provincia)
   SELECT DISTINCT
-    CLIENTE_NOMBRE              as dni,
-    CLIENTE_APELLIDO            as nombre,
-    CLIENTE_DNI                 as apellido,
-    CLIENTE_FECHA_REGISTRO      as domicilio,
-    CLIENTE_TELEFONO            as registro,
-    CLIENTE_MAIL                as telefono,
-    CLIENTE_FECHA_NACIMIENTO    as mail,
-    CLIENTE_DOMICILIO           as nacimiento,
-    CLIENTE_LOCALIDAD           as id_localidad,
-    CLIENTE_PROVINCIA           as id_provincia
+    CLIENTE_DNI                 as dni,
+    CLIENTE_NOMBRE              as nombre,
+    CLIENTE_APELLIDO            as apellido,
+    CLIENTE_DOMICILIO           as domicilio,
+    CLIENTE_FECHA_REGISTRO      as registro,
+    CLIENTE_TELEFONO            as telefono,
+    CLIENTE_MAIL                as mail,
+    CLIENTE_FECHA_NACIMIENTO    as nacimiento,
+    l.id_localidad              as id_localidad,
+    p.id_provincia              as id_provincia
   FROM gd_esquema.Maestra
+  JOIN localidad l ON CLIENTE_LOCALIDAD = l.nombre
+  JOIN provincia p ON CLIENTE_PROVINCIA = p.nombre AND l.id_provincia = p.id_provincia
   WHERE 
     CLIENTE_NOMBRE            is not null and
     CLIENTE_APELLIDO          is not null and
