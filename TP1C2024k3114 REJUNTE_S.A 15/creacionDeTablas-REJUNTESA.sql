@@ -705,6 +705,31 @@ BEGIN
   PRINT('SP MIGRAR CLIENTE OK!')
 END
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_sucursal
+AS
+BEGIN
+  INSERT INTO [REJUNTESA].sucursal(id_supermercado, nombre, direccion, id_localidad, id_provincia)
+  SELECT DISTINCT
+    s.id_supermercado   as id_supermercado,
+    SUCURSAL_NOMBRE     as nombre,
+    SUCURSAL_DIRECCION  as direccion,
+    l.id_localidad      as id_localidad,
+    p.id_provincia      as id_provincia
+  FROM gd_esquema.Maestra
+  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
+  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
+  JOIN [REJUNTESA].supermercado s on s.nombre = SUCURSAL_NOMBRE
+  WHERE
+  SUCURSAL_NOMBRE    is not null and
+  SUCURSAL_DIRECCION is not null and
+  SUCURSAL_LOCALIDAD is not null and
+  SUCURSAL_PROVINCIA is not null
+  IF @@ERROR != 0
+  PRINT('SP Sucursal FAIL!')
+  ELSE
+  PRINT('SP Sucursal OK!')
+END
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
@@ -731,6 +756,15 @@ EXEC REJUNTESA.migrar_promocion_producto
 GO
 EXEC REJUNTESA.migrar_medio_pago
 
+GO
+EXEC REJUNTESA.migrar_provincia
+
+GO
+EXEC REJUNTESA.migrar_localidad
+
+GO
+EXEC REJUNTESA.migrar_sucursal
+
 -- FIN: EJECUCION DE PROCEDURES.
 
 SELECT * FROM [GD1C2024].[REJUNTESA].[medio_pago];
@@ -740,3 +774,4 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[subcategoria];
 SELECT * FROM [GD1C2024].[REJUNTESA].[categoria];
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
 SELECT * FROM [GD1C2024].[REJUNTESA].[regla];
+SELECT * FROM [GD1C2024].[REJUNTESA].[sucursal];
