@@ -389,6 +389,7 @@ BEGIN
   PRINT('SP TIPO CAJA OK!')
 END
 
+
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_categoria 
 AS 
@@ -456,21 +457,22 @@ CREATE PROCEDURE [REJUNTESA].migrar_regla
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].regla(descripcion, descuento, cantidad_aplicable_regla, cantidad_aplicable_descuento, veces_aplicable, misma_marca, mismo_producto)
-  SELECT DISTINCT
+  SELECT DISTINCT      
     REGLA_DESCRIPCION               as descripcion,
     REGLA_DESCUENTO_APLICABLE_PROD  as descuento,
     REGLA_CANT_APLICABLE_REGLA      as cantidad_aplicable_regla,
     REGLA_CANT_APLICA_DESCUENTO     as cantidad_aplicable_descuento,
-    REGLA_CANT_APLICABLE_REGLA      as veces_aplicable,
+    REGLA_CANT_MAX_PROD             as veces_aplicable,
     REGLA_APLICA_MISMA_MARCA        as misma_marca,
     REGLA_APLICA_MISMO_PROD         as mismo_producto
   FROM gd_esquema.Maestra
   WHERE 
-  PRODUCTO_SUB_CATEGORIA is not null and
-  PRODUCTO_NOMBRE        is not null and
-  PRODUCTO_DESCRIPCION   is not null and
-  PRODUCTO_PRECIO        is not null and
-  PRODUCTO_MARCA         is not null
+  REGLA_DESCRIPCION is not null and
+  REGLA_DESCUENTO_APLICABLE_PROD        is not null and
+  REGLA_CANT_APLICABLE_REGLA   is not null and
+  REGLA_CANT_APLICA_DESCUENTO        is not null and
+  REGLA_APLICA_MISMA_MARCA         is not null
+  REGLA_APLICA_MISMO_PROD                is not null
   IF @@ERROR != 0
   PRINT('SP REGLA FAIL!')
   ELSE
@@ -516,90 +518,8 @@ BEGIN
   ELSE
   PRINT('SP MEDIO PAGO OK!')
 END
-
-SELECT TOP 1000 [SUPER_NOMBRE]
-      ,[SUPER_RAZON_SOC]
-      ,[SUPER_CUIT]
-      ,[SUPER_IIBB]
-      ,[SUPER_DOMICILIO]
-      ,[SUPER_FECHA_INI_ACTIVIDAD]
-      ,[SUPER_CONDICION_FISCAL]
-      ,[SUPER_LOCALIDAD]
-      ,[SUPER_PROVINCIA]
-      ,[SUCURSAL_NOMBRE]
-      ,[SUCURSAL_DIRECCION]
-      ,[SUCURSAL_LOCALIDAD]
-      ,[SUCURSAL_PROVINCIA]
-      ,[TICKET_NUMERO]
-      ,[TICKET_FECHA_HORA]
-      ,[TICKET_TIPO_COMPROBANTE]
-      ,[TICKET_SUBTOTAL_PRODUCTOS]
-      ,[TICKET_TOTAL_DESCUENTO_APLICADO]
-      ,[TICKET_TOTAL_DESCUENTO_APLICADO_MP]
-      ,[TICKET_TOTAL_ENVIO]
-      ,[TICKET_TOTAL_TICKET]
-      ,[EMPLEADO_NOMBRE]
-      ,[EMPLEADO_APELLIDO]
-      ,[EMPLEADO_DNI]
-      ,[EMPLEADO_FECHA_REGISTRO]
-      ,[EMPLEADO_TELEFONO]
-      ,[EMPLEADO_MAIL]
-      ,[EMPLEADO_FECHA_NACIMIENTO]
-      ,[CAJA_NUMERO]
-      ,[CAJA_TIPO]
-      ,[TICKET_DET_CANTIDAD]
-      ,[TICKET_DET_PRECIO]
-      ,[TICKET_DET_TOTAL]
-      ,[PRODUCTO_NOMBRE]
-      ,[PRODUCTO_DESCRIPCION]
-      ,[PRODUCTO_PRECIO]
-      ,[PRODUCTO_MARCA]
-      ,[PRODUCTO_SUB_CATEGORIA]
-      ,[PRODUCTO_CATEGORIA]
-      ,[PROMO_APLICADA_DESCUENTO]
-      ,[PROMO_CODIGO]
-      ,[PROMOCION_DESCRIPCION]
-      ,[PROMOCION_FECHA_INICIO]
-      ,[PROMOCION_FECHA_FIN]
-      ,[REGLA_APLICA_MISMA_MARCA]
-      ,[REGLA_APLICA_MISMO_PROD]
-      ,[REGLA_CANT_APLICA_DESCUENTO]
-      ,[REGLA_CANT_APLICABLE_REGLA]
-      ,[REGLA_CANT_MAX_PROD]
-      ,[REGLA_DESCRIPCION]
-      ,[REGLA_DESCUENTO_APLICABLE_PROD]
-      ,[PAGO_FECHA]
-      ,[PAGO_IMPORTE]
-      ,[PAGO_MEDIO_PAGO]
-      ,[PAGO_TIPO_MEDIO_PAGO]
-      ,[PAGO_TARJETA_NRO]
-      ,[PAGO_TARJETA_CUOTAS]
-      ,[PAGO_TARJETA_FECHA_VENC]
-      ,[PAGO_DESCUENTO_APLICADO]
-      ,[DESCUENTO_CODIGO]
-      ,[DESCUENTO_DESCRIPCION]
-      ,[DESCUENTO_FECHA_INICIO]
-      ,[DESCUENTO_FECHA_FIN]
-      ,[DESCUENTO_PORCENTAJE_DESC]
-      ,[DESCUENTO_TOPE]
-      ,[ENVIO_COSTO]
-      ,[ENVIO_FECHA_PROGRAMADA]
-      ,[ENVIO_HORA_INICIO]
-      ,[ENVIO_HORA_FIN]
-      ,[ENVIO_FECHA_ENTREGA]
-      ,[ENVIO_ESTADO]
-      ,[CLIENTE_NOMBRE]
-      ,[CLIENTE_APELLIDO]
-      ,[CLIENTE_DNI]
-      ,[CLIENTE_FECHA_REGISTRO]
-      ,[CLIENTE_TELEFONO]
-      ,[CLIENTE_MAIL]
-      ,[CLIENTE_FECHA_NACIMIENTO]
-      ,[CLIENTE_DOMICILIO]
-      ,[CLIENTE_LOCALIDAD]
-      ,[CLIENTE_PROVINCIA]
-  FROM [GD1C2024].[gd_esquema].[Maestra]
   
+
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_localidad
 AS 
@@ -627,6 +547,7 @@ BEGIN
 	PRINT('SP LOCALIDAD OK!')
 END
 
+
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_provincia
 AS 
@@ -648,6 +569,7 @@ BEGIN
 	ELSE
 	PRINT('SP PROVINCIA OK!')
 END
+
 
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_cliente 
@@ -686,6 +608,41 @@ BEGIN
 END
 
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_supermercado
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].supermercado(nombre, razon_social, cuit, iibb, domicilio, fecha_inicio_actividad, comision_fiscal, id_localidad, id_provincia)
+  SELECT DISTINCT
+    SUPER_NOMBRE                as nombre,
+    SUPER_RAZON_SOC             as razon_social,
+    SUPER_CUIT                  as cuit,
+    SUPER_IIBB                  as iibb,
+    SUPER_DOMICILIO             as domicilio,
+    SUPER_FECHA_INI_ACTIVIDAD   as fecha_inicio_actividad,
+    SUPER_CONDICION_FISCAL      as comision_fiscal,
+    l.id_localidad              as id_localidad,
+    p.id_provincia              as id_provincia
+  FROM gd_esquema.Maestra
+  JOIN localidad l ON SUPER_LOCALIDAD = l.nombre
+  JOIN provincia p ON SUPER_PROVINCIA = p.nombre AND l.id_provincia = p.id_provincia
+  WHERE 
+    SUPER_NOMBRE              is not null and
+    SUPER_RAZON_SOC           is not null and
+    SUPER_CUIT                is not null and
+    SUPER_IIBB                is not null and
+    SUPER_DOMICILIO           is not null and
+    SUPER_FECHA_INI_ACTIVIDAD is not null and
+    SUPER_CONDICION_FISCAL    is not null and
+    SUPER_LOCALIDAD           is not null and
+    SUPER_PROVINCIA           is not null
+  IF @@ERROR != 0
+  PRINT('SP MIGRAR SUPERMERCADO FAIL!')
+  ELSE
+  PRINT('SP MIGRAR SUPERMERCADO OK!')
+END
+
+
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
 -- INICIO: EJECUCION DE PROCEDURES.
@@ -711,12 +668,30 @@ EXEC REJUNTESA.migrar_promocion_producto
 GO
 EXEC REJUNTESA.migrar_medio_pago
 
+GO
+EXEC REJUNTESA.migrar_provincia
+
+GO
+EXEC REJUNTESA.migrar_localidad
+
+GO
+EXEC REJUNTESA.migrar_cliente
+
+GO
+EXEC REJUNTESA.migrar_supermercado
+
+
+
 -- FIN: EJECUCION DE PROCEDURES.
 
-SELECT * FROM [GD1C2024].[REJUNTESA].[medio_pago];
-SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[subcategoria];
-SELECT * FROM [GD1C2024].[REJUNTESA].[categoria];
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
+SELECT * FROM [GD1C2024].[REJUNTESA].[categoria];
+SELECT * FROM [GD1C2024].[REJUNTESA].[subcategoria];
+SELECT * FROM [GD1C2024].[REJUNTESA].[producto];
 SELECT * FROM [GD1C2024].[REJUNTESA].[regla];
+SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto];
+SELECT * FROM [GD1C2024].[REJUNTESA].[pago];
+SELECT * FROM [GD1C2024].[REJUNTESA].[localidad];
+SELECT * FROM [GD1C2024].[REJUNTESA].[provincia];
+SELECT * FROM [GD1C2024].[REJUNTESA].[cliente];
+SELECT * FROM [GD1C2024].[REJUNTESA].[supermercado];
