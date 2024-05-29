@@ -1,4 +1,4 @@
-﻿ [GD1C2024]
+ [GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -701,17 +701,17 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].detalle_pago(id_cliente, nro_tarjeta, vencimiento_tarjeta, cuotas)
   SELECT DISTINCT
-    c.id_cliente            as id_cliente,                      
-    PAGO_TARJETA_NRO        as nro_tarjeta,
-    PAGO_TARJETA_FECHA_VENC as vencimiento_tarjeta,
-    PAGO_TARJETA_CUOTAS     as cuotas,
-  FROM gd_esquema.Maestra
+    c.id_cliente						 as id_cliente,                      
+    maestra_pago.PAGO_TARJETA_NRO        as nro_tarjeta,
+    maestra_pago.PAGO_TARJETA_FECHA_VENC as vencimiento_tarjeta,
+    maestra_pago.PAGO_TARJETA_CUOTAS     as cuotas
+  FROM gd_esquema.Maestra as maestra_pago
 
-  JOIN cliente c on CLIENTE_NOMBRE = c.nombre AND CLIENTE_APELLIDO = c.apellido AND CLIENTE_DNI = c.dni
+  JOIN [GD1C2024].[gd_esquema].[Maestra] as maestra_cliente ON maestra_pago.TICKET_NUMERO = maestra_cliente.TICKET_NUMERO
+  JOIN cliente c ON maestra_cliente.CLIENTE_DNI = c.dni
 
   WHERE
-  PAGO_TARJETA_NRO is not null and
-  PAGO_TARJETA_FECHA_VENC is not null
+  maestra_pago.PAGO_TARJETA_NRO is not null AND maestra_cliente.CLIENTE_DNI is not null
   IF @@ERROR != 0
   PRINT('SP DETALLE PAGO FAIL!')
   ELSE
@@ -725,11 +725,11 @@ BEGIN
   INSERT INTO [REJUNTESA].descuento_medio_pago(cod_descuento, descripcion, fecha_inicio, fecha_final, porcentaje, tope)
   SELECT DISTINCT
     DESCUENTO_CODIGO          as cod_descuento,
-    DESCRIPCION               as descripcion,
+    DESCUENTO_DESCRIPCION     as descripcion,
     DESCUENTO_FECHA_INICIO    as fecha_inicio,
     DESCUENTO_FECHA_FIN       as fecha_final,
     DESCUENTO_PORCENTAJE_DESC as porcentaje,
-    DESCUENTO_TOPE            as tope,
+    DESCUENTO_TOPE            as tope
   FROM gd_esquema.Maestra
   WHERE 
   DESCUENTO_CODIGO          is not null and
@@ -756,7 +756,7 @@ BEGIN
     EMPLEADO_TELEFONO         as telefono,
     EMPLEADO_MAIL             as mail,
     EMPLEADO_FECHA_NACIMIENTO as nacimiento,
-    EMPLEADO_FECHA_REGISTRO   as registro,
+    EMPLEADO_FECHA_REGISTRO   as registro
   FROM gd_esquema.Maestra
 
   JOIN supermercado sup ON SUPER_NOMBRE = sup.nombre
@@ -815,6 +815,15 @@ EXEC REJUNTESA.migrar_sucursal
 GO
 EXEC REJUNTESA.migrar_caja
 
+GO
+EXEC REJUNTESA.migrar_descuento_medio_pago
+
+GO
+EXEC REJUNTESA.migrar_empleado
+
+GO
+EXEC REJUNTESA.migrar_detalle_pago
+
 -- FIN: EJECUCION DE PROCEDURES.
 
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
@@ -829,3 +838,6 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[cliente];
 SELECT * FROM [GD1C2024].[REJUNTESA].[supermercado];
 SELECT * FROM [GD1C2024].[REJUNTESA].[sucursal];
 SELECT * FROM [GD1C2024].[REJUNTESA].[caja];
+SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_medio_pago];
+SELECT * FROM [GD1C2024].[REJUNTESA].[empleado];
+SELECT * FROM [GD1C2024].[REJUNTESA].[detalle_pago];
