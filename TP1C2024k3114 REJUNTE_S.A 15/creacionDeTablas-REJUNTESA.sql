@@ -724,7 +724,7 @@ CREATE PROCEDURE [REJUNTESA].migrar_descuento_medio_pago
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].descuento_medio_pago(cod_descuento, descripcion, fecha_inicio, fecha_final, porcentaje, tope)
-  SELECT DISTINCT
+  SELECT DISTINCT 
     DESCUENTO_CODIGO          as cod_descuento,
     DESCUENTO_DESCRIPCION     as descripcion,
     DESCUENTO_FECHA_INICIO    as fecha_inicio,
@@ -778,7 +778,7 @@ CREATE PROCEDURE [REJUNTESA].migrar_producto_x_promocion_producto
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto_x_promocion_producto(id_producto, cod_promocion)
-  SELECT DISTINCT                        
+  SELECT DISTINCT TOP (1000)                 
     p.id_producto			   as id_producto,
     maestra_promo.PROMO_CODIGO as cod_promocion
   FROM [GD1C2024].[gd_esquema].[Maestra] as maestra_producto
@@ -889,9 +889,10 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_venta
 AS 
 BEGIN
-  INSERT INTO [REJUNTESA].venta(nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
-  SELECT DISTINCT   
-    TICKET_NUMERO                      as nro_ticket,
+  INSERT INTO [REJUNTESA].venta(
+    nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
+  SELECT DISTINCT  
+    TICKET_NUMERO                      as nro_ticket, 
     s.id_sucursal                      as id_sucursal,
     CAJA_NUMERO                        as nro_caja,
     e.legajo_empleado                  as legajo_empleado,
@@ -922,8 +923,8 @@ CREATE PROCEDURE [REJUNTESA].migrar_pago
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].pago(nro_ticket, id_medio_pago, id_detalle_pago, fecha_pago, importe, descuento_aplicado)
-  SELECT DISTINCT      
-    REGLA_DESCRIPCION           as nro_ticket,
+  SELECT DISTINCT        
+    TICKET_NUMERO               as nro_ticket,
     mp.id_medio_pago            as id_medio_pago,
     dp.id_detalle_pago          as id_detalle_pago,
     PAGO_FECHA                  as fecha_pago,
@@ -939,6 +940,60 @@ BEGIN
   ELSE
   PRINT('SP PAGO OK!')
 END
+
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_producto_vendido
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
+  SELECT DISTINCT
+    TICKET_NUMERO               as nro_ticket,
+    prod.id_producto            as id_producto,
+    TICKET_DET_CANTIDAD         as cantidad,
+    TICKET_DET_TOTAL            as precio_total
+  FROM gd_esquema.Maestra
+  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
+  JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
+
+  WHERE 
+    TICKET_NUMERO                          is not null AND
+    TICKET_DET_CANTIDAD                    is not null 
+
+  IF @@ERROR != 0
+    PRINT('SP PRODUCTO VENDIDO FAIL!')
+  ELSE
+    PRINT('SP PRODUCTO VENDIDO OK!')
+END
+
+
+
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada 
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
+  SELECT DISTINCT
+    TICKET_NUMERO                        as nro_ticket,
+    prod.id_producto                     as id_producto,
+    prom.cod_promocion                   as cod_promocion,
+    COALESCE(PAGO_DESCUENTO_APLICADO,0)  as descuento_total
+  FROM gd_esquema.Maestra
+  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
+  JOIN promocion_producto prom ON prom.cod_promocion = PROMO_CODIGO
+   
+   WHERE 
+  TICKET_NUMERO                          is not null AND
+  PRODUCTO_NOMBRE                        is not null AND
+  PAGO_DESCUENTO_APLICADO                is not null 
+
+  IF @@ERROR != 0
+  PRINT('SP PROMOCION APLICADA FAIL!')
+  ELSE
+  PRINT('SP PROMOCION APLICADA OK!')
+END
+
 
 
 
@@ -995,8 +1050,8 @@ EXEC REJUNTESA.migrar_empleado
 GO
 EXEC REJUNTESA.migrar_detalle_pago
 
---GO
---EXEC REJUNTESA.migrar_producto_x_promocion_producto
+GO
+EXEC REJUNTESA.migrar_producto_x_promocion_producto
 
 GO
 EXEC REJUNTESA.migrar_promocion_producto_x_regla
@@ -1010,9 +1065,14 @@ EXEC REJUNTESA.migrar_venta
 GO
 EXEC REJUNTESA.migrar_pago
 
+GO
+EXEC REJUNTESA.migrar_producto_vendido
 
---GO
---EXEC REJUNTESA.migrar_envio
+GO
+EXEC REJUNTESA.migrar_promocion_aplicada
+
+GO
+EXEC REJUNTESA.migrar_envio
 
 -- FIN: EJECUCION DE PROCEDURES.
 
@@ -1037,3 +1097,10 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_x_medio_pago];
 --SELECT * FROM [GD1C2024].[REJUNTESA].[envio];
 SELECT * FROM [GD1C2024].[REJUNTESA].[venta];
 SELECT * FROM [GD1C2024].[REJUNTESA].[pago];
+
+
+SELECT * FROM [GD1C2024].[REJUNTESA].[venta]
+SELECT * FROM [GD1C2024].[REJUNTESA].[pago]
+SELECT * FROM [GD1C2024].[REJUNTESA].[producto_vendido]
+SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_aplicada]
+SELECT * FROM [GD1C2024].[REJUNTESA].[envio]
