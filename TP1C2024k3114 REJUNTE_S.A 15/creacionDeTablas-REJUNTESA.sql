@@ -1,4 +1,4 @@
-﻿USE [GD1C2024]
+USE [GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -244,7 +244,7 @@ CREATE TABLE [REJUNTESA].[venta] (
   [nro_ticket] decimal(18,0),
   [id_sucursal] int,
   [nro_caja] decimal(18,0),
-  [legajo_empleado] decimal(18,0),
+  [legajo_empleado] int,
   [fecha] datetime,
   [tipo_comprobante] nvarchar(255),
   [sub_total] decimal(18,2),
@@ -471,7 +471,7 @@ BEGIN
   REGLA_DESCUENTO_APLICABLE_PROD        is not null and
   REGLA_CANT_APLICABLE_REGLA   is not null and
   REGLA_CANT_APLICA_DESCUENTO        is not null and
-  REGLA_APLICA_MISMA_MARCA         is not null
+  REGLA_APLICA_MISMA_MARCA         is not null and
   REGLA_APLICA_MISMO_PROD                is not null
   IF @@ERROR != 0
   PRINT('SP REGLA FAIL!')
@@ -518,7 +518,8 @@ BEGIN
   ELSE
   PRINT('SP MEDIO PAGO OK!')
 END
-  
+ 
+
 
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_localidad
@@ -608,32 +609,6 @@ BEGIN
 END
 
 GO
-CREATE PROCEDURE [REJUNTESA].migrar_sucursal
-AS
-BEGIN
-  INSERT INTO [REJUNTESA].sucursal(id_supermercado, nombre, direccion, id_localidad, id_provincia)
-  SELECT DISTINCT
-    s.id_supermercado   as id_supermercado,
-    SUCURSAL_NOMBRE     as nombre,
-    SUCURSAL_DIRECCION  as direccion,
-    l.id_localidad      as id_localidad,
-    p.id_provincia      as id_provincia
-  FROM gd_esquema.Maestra
-  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
-  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
-  JOIN [REJUNTESA].supermercado s on s.nombre = SUCURSAL_NOMBRE
-  WHERE
-  SUCURSAL_NOMBRE    is not null and
-  SUCURSAL_DIRECCION is not null and
-  SUCURSAL_LOCALIDAD is not null and
-  SUCURSAL_PROVINCIA is not null
-  IF @@ERROR != 0
-  PRINT('SP Sucursal FAIL!')
-  ELSE
-  PRINT('SP Sucursal OK!')
-END
-
-GO
 CREATE PROCEDURE [REJUNTESA].migrar_supermercado
 AS 
 BEGIN
@@ -666,6 +641,61 @@ BEGIN
   ELSE
   PRINT('SP MIGRAR SUPERMERCADO OK!')
 END
+
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_sucursal
+AS
+BEGIN
+  INSERT INTO [REJUNTESA].sucursal(id_supermercado, nombre, direccion, id_localidad, id_provincia)
+  SELECT DISTINCT
+    s.id_supermercado   as id_supermercado,
+    SUCURSAL_NOMBRE     as nombre,
+    SUCURSAL_DIRECCION  as direccion,
+    l.id_localidad      as id_localidad,
+    p.id_provincia      as id_provincia
+  FROM gd_esquema.Maestra
+  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
+  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
+  JOIN [REJUNTESA].supermercado s on s.nombre = SUPER_NOMBRE
+  WHERE
+  SUCURSAL_NOMBRE    is not null and
+  SUCURSAL_DIRECCION is not null and
+  SUCURSAL_LOCALIDAD is not null and
+  SUCURSAL_PROVINCIA is not null
+  IF @@ERROR != 0
+  PRINT('SP Sucursal FAIL!')
+  ELSE
+  PRINT('SP Sucursal OK!')
+END
+
+
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_caja 
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].caja(nro_caja, id_sucursal,id_tipo_caja)
+
+  SELECT DISTINCT
+	CAJA_NUMERO as nro_caja,
+	suc.id_sucursal as id_sucursal,
+	t.id_tipo_caja as id_tipo_caja
+  FROM gd_esquema.Maestra
+
+  JOIN tipo_caja t on CAJA_TIPO = t.nombre
+  JOIN sucursal suc on SUCURSAL_NOMBRE = suc.nombre
+  JOIN supermercado sup on SUPER_NOMBRE = sup.nombre
+
+  WHERE CAJA_TIPO is not null and SUCURSAL_NOMBRE is not null
+
+  IF @@ERROR != 0
+  PRINT('SP CAJA FAIL!')
+  ELSE
+  PRINT('SP CAJA OK!')
+END
+
+
 
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
@@ -708,6 +738,9 @@ EXEC REJUNTESA.migrar_supermercado
 GO
 EXEC REJUNTESA.migrar_sucursal
 
+GO
+EXEC REJUNTESA.migrar_caja
+
 -- FIN: EJECUCION DE PROCEDURES.
 
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
@@ -716,9 +749,9 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[subcategoria];
 SELECT * FROM [GD1C2024].[REJUNTESA].[producto];
 SELECT * FROM [GD1C2024].[REJUNTESA].[regla];
 SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[pago];
 SELECT * FROM [GD1C2024].[REJUNTESA].[localidad];
 SELECT * FROM [GD1C2024].[REJUNTESA].[provincia];
 SELECT * FROM [GD1C2024].[REJUNTESA].[cliente];
 SELECT * FROM [GD1C2024].[REJUNTESA].[supermercado];
 SELECT * FROM [GD1C2024].[REJUNTESA].[sucursal];
+SELECT * FROM [GD1C2024].[REJUNTESA].[caja];
