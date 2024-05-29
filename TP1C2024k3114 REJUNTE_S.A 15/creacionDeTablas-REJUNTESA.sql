@@ -608,34 +608,8 @@ BEGIN
 END
 
 GO
-CREATE PROCEDURE [REJUNTESA].migrar_sucursal
-AS
-BEGIN
-  INSERT INTO [REJUNTESA].sucursal(id_supermercado, nombre, direccion, id_localidad, id_provincia)
-  SELECT DISTINCT
-    s.id_supermercado   as id_supermercado,
-    SUCURSAL_NOMBRE     as nombre,
-    SUCURSAL_DIRECCION  as direccion,
-    l.id_localidad      as id_localidad,
-    p.id_provincia      as id_provincia
-  FROM gd_esquema.Maestra
-  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
-  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
-  JOIN [REJUNTESA].supermercado s on s.nombre = SUCURSAL_NOMBRE
-  WHERE
-  SUCURSAL_NOMBRE    is not null and
-  SUCURSAL_DIRECCION is not null and
-  SUCURSAL_LOCALIDAD is not null and
-  SUCURSAL_PROVINCIA is not null
-  IF @@ERROR != 0
-  PRINT('SP Sucursal FAIL!')
-  ELSE
-  PRINT('SP Sucursal OK!')
-END
-
-GO
 CREATE PROCEDURE [REJUNTESA].migrar_supermercado
-AS 
+AS
 BEGIN
   INSERT INTO [REJUNTESA].supermercado(nombre, razon_social, cuit, iibb, domicilio, fecha_inicio_actividad, comision_fiscal, id_localidad, id_provincia)
   SELECT DISTINCT
@@ -651,7 +625,7 @@ BEGIN
   FROM gd_esquema.Maestra
   JOIN localidad l ON SUPER_LOCALIDAD = l.nombre
   JOIN provincia p ON SUPER_PROVINCIA = p.nombre AND l.id_provincia = p.id_provincia
-  WHERE 
+  WHERE
     SUPER_NOMBRE              is not null and
     SUPER_RAZON_SOC           is not null and
     SUPER_CUIT                is not null and
@@ -667,6 +641,40 @@ BEGIN
   PRINT('SP MIGRAR SUPERMERCADO OK!')
 END
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_sucursal
+AS
+BEGIN
+  INSERT INTO [REJUNTESA].sucursal(id_supermercado, nombre, direccion, id_localidad, id_provincia)
+  SELECT DISTINCT
+    s.id_supermercado   as id_supermercado,
+    SUCURSAL_NOMBRE     as nombre,
+    SUCURSAL_DIRECCION  as direccion,
+    l.id_localidad      as id_localidad,
+    p.id_provincia      as id_provincia
+  FROM gd_esquema.Maestra
+  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
+  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
+  JOIN [REJUNTESA].supermercado s on s.nombre = SUPER_NOMBRE
+  WHERE
+  SUCURSAL_NOMBRE    is not null and
+  SUCURSAL_DIRECCION is not null and
+  SUCURSAL_LOCALIDAD is not null and
+  SUCURSAL_PROVINCIA is not null
+  IF @@ERROR != 0
+  PRINT('SP Sucursal FAIL!')
+  ELSE
+  PRINT('SP Sucursal OK!')
+END
+
+select *
+from REJUNTESA.supermercado s3;
+
+select *
+from REJUNTESA.sucursal s4;
+
+select SUCURSAL_NOMBRE
+from gd_esquema.Maestra M;
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
