@@ -95,7 +95,7 @@ CREATE TABLE [REJUNTESA].[regla] (
 );
 
 CREATE TABLE [REJUNTESA].[promocion_producto] (
-  [cod_promocion] int IDENTITY(1,1),
+  [cod_promocion] decimal(18,0),
   [descripcion] nvarchar(255),
   [fecha_inicio] datetime,
   [fecha_final] datetime,
@@ -319,7 +319,7 @@ CREATE TABLE [REJUNTESA].[producto_vendido] (
 CREATE TABLE [REJUNTESA].[promocion_aplicada] (
   [nro_ticket] decimal(18,0),
   [id_producto] int,
-  [cod_promocion] int,
+  [cod_promocion] decimal(18,0),
   [descuento_total] decimal(18,2),
   PRIMARY KEY ([nro_ticket], [id_producto], [cod_promocion]),
   CONSTRAINT [FK_nro_ticket_en_promocion_aplicada.nro_ticket]
@@ -334,7 +334,7 @@ CREATE TABLE [REJUNTESA].[promocion_aplicada] (
 
 CREATE TABLE [REJUNTESA].[producto_x_promocion_producto] (
   [id_producto] int,
-  [cod_promocion] int,
+  [cod_promocion] decimal(18,0),
   PRIMARY KEY ([id_producto], [cod_promocion]),
   CONSTRAINT [FK_id_producto_en_producto_x_promocion_producto.id_producto]
     FOREIGN KEY ([id_producto])
@@ -345,7 +345,7 @@ CREATE TABLE [REJUNTESA].[producto_x_promocion_producto] (
 );
 
 CREATE TABLE [REJUNTESA].[promocion_producto_x_regla] (
-  [cod_promocion] int,
+  [cod_promocion] decimal(18,0),
   [id_regla] int,
   PRIMARY KEY ([cod_promocion], [id_regla]),
   CONSTRAINT [FK_cod_promocion_en_promocion_producto_x_regla.cod_promocion]
@@ -484,13 +484,15 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_promocion_producto 
 AS 
 BEGIN
-  INSERT INTO [REJUNTESA].promocion_producto(descripcion, fecha_inicio, fecha_final)
+  INSERT INTO [REJUNTESA].promocion_producto(cod_promocion, descripcion, fecha_inicio, fecha_final)
   SELECT DISTINCT
+	PROMO_CODIGO			as cod_promocion,
     PROMOCION_DESCRIPCION   as descripcion,
     PROMOCION_FECHA_INICIO  as fecha_inicio,
     PROMOCION_FECHA_FIN     as fecha_final
   FROM gd_esquema.Maestra
-  WHERE 
+  WHERE
+  PROMO_CODIGO			 is not null and
   PROMOCION_DESCRIPCION  is not null and
   PROMOCION_FECHA_INICIO is not null and
   PROMOCION_FECHA_FIN    is not null
@@ -772,6 +774,35 @@ BEGIN
   PRINT('SP EMPLEADO OK!')
 END
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_producto_x_promocion_producto
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].producto_x_promocion_producto(id_producto, cod_promocion)
+  SELECT DISTINCT                        
+    p.id_producto			   as id_producto,
+    maestra_promo.PROMO_CODIGO as cod_promocion
+  FROM [GD1C2024].[gd_esquema].[Maestra] as maestra_producto
+
+  JOIN [GD1C2024].[gd_esquema].[Maestra] as maestra_promo ON maestra_promo.TICKET_NUMERO = maestra_producto.TICKET_NUMERO
+  JOIN categoria cat ON maestra_producto.PRODUCTO_CATEGORIA = cat.categoria
+  JOIN subcategoria sub ON maestra_producto.PRODUCTO_SUB_CATEGORIA = sub.subcategoria
+  JOIN producto p ON 
+	maestra_producto.PRODUCTO_NOMBRE = p.nombre AND
+	maestra_producto.PRODUCTO_DESCRIPCION = p.descripcion AND
+	maestra_producto.PRODUCTO_PRECIO= p.precio AND
+	maestra_producto.PRODUCTO_MARCA= p.marca AND
+	maestra_producto.PRODUCTO_CATEGORIA= cat.categoria AND
+	maestra_producto.PRODUCTO_SUB_CATEGORIA= sub.subcategoria
+
+  WHERE
+  maestra_producto.PROMO_CODIGO is not null AND maestra_promo.PROMO_CODIGO is not null
+  IF @@ERROR != 0
+  PRINT('SP PRODUCTO X PROMOCION_PRODUCTO FAIL!')
+  ELSE
+  PRINT('SP PRODUCTO X PROMOCION_PRODUCTO OK!')
+END
+
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
 -- INICIO: EJECUCION DE PROCEDURES.
@@ -824,6 +855,9 @@ EXEC REJUNTESA.migrar_empleado
 GO
 EXEC REJUNTESA.migrar_detalle_pago
 
+--GO
+--EXEC REJUNTESA.migrar_producto_x_promocion_producto
+
 -- FIN: EJECUCION DE PROCEDURES.
 
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
@@ -841,3 +875,4 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[caja];
 SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_medio_pago];
 SELECT * FROM [GD1C2024].[REJUNTESA].[empleado];
 SELECT * FROM [GD1C2024].[REJUNTESA].[detalle_pago];
+--SELECT * FROM [GD1C2024].[REJUNTESA].[producto_x_promocion_producto];
