@@ -110,7 +110,7 @@ CREATE TABLE [REJUNTESA].[medio_pago] (
 );
 
 CREATE TABLE [REJUNTESA].[descuento_medio_pago] (
-  [cod_descuento] int IDENTITY(1,1),
+  [cod_descuento] decimal(18,0),
   [descripcion] nvarchar(255),
   [fecha_inicio] datetime,
   [fecha_final] datetime,
@@ -225,7 +225,7 @@ CREATE TABLE [REJUNTESA].[caja] (
 );
 
 CREATE TABLE [REJUNTESA].[empleado] (
-  [legajo_empleado] decimal(18,0),
+  [legajo_empleado] int IDENTITY(1,1),
   [id_sucursal] int,
   [dni] decimal(18,0),
   [nombre] nvarchar(255),
@@ -358,7 +358,7 @@ CREATE TABLE [REJUNTESA].[promocion_producto_x_regla] (
 
 CREATE TABLE [REJUNTESA].[descuento_x_medio_pago] (
   [id_medio_pago ] int,
-  [cod_descuento] int,
+  [cod_descuento] decimal(18,0),
   PRIMARY KEY ([id_medio_pago], [cod_descuento]),
   CONSTRAINT [FK_id_medio_pago_en_descuento_x_medio_pago.id_medio_pago]
     FOREIGN KEY ([id_medio_pago])
