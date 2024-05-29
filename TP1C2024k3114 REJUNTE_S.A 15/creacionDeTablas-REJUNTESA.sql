@@ -1,4 +1,4 @@
-USE [GD1C2024]
+﻿ [GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -695,8 +695,82 @@ BEGIN
   PRINT('SP CAJA OK!')
 END
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_detalle_pago
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].detalle_pago(id_cliente, nro_tarjeta, vencimiento_tarjeta, cuotas)
+  SELECT DISTINCT
+    c.id_cliente            as id_cliente,                      
+    PAGO_TARJETA_NRO        as nro_tarjeta,
+    PAGO_TARJETA_FECHA_VENC as vencimiento_tarjeta,
+    PAGO_TARJETA_CUOTAS     as cuotas,
+  FROM gd_esquema.Maestra
 
+  JOIN cliente c on CLIENTE_NOMBRE = c.nombre AND CLIENTE_APELLIDO = c.apellido AND CLIENTE_DNI = c.dni
 
+  WHERE
+  PAGO_TARJETA_NRO is not null and
+  PAGO_TARJETA_FECHA_VENC is not null
+  IF @@ERROR != 0
+  PRINT('SP DETALLE PAGO FAIL!')
+  ELSE
+  PRINT('SP DETALLE PAGO OK!')
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_descuento_medio_pago 
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].descuento_medio_pago(cod_descuento, descripcion, fecha_inicio, fecha_final, porcentaje, tope)
+  SELECT DISTINCT
+    DESCUENTO_CODIGO          as cod_descuento,
+    DESCRIPCION               as descripcion,
+    DESCUENTO_FECHA_INICIO    as fecha_inicio,
+    DESCUENTO_FECHA_FIN       as fecha_final,
+    DESCUENTO_PORCENTAJE_DESC as porcentaje,
+    DESCUENTO_TOPE            as tope,
+  FROM gd_esquema.Maestra
+  WHERE 
+  DESCUENTO_CODIGO          is not null and
+  DESCUENTO_FECHA_INICIO    is not null and
+  DESCUENTO_FECHA_FIN       is not null and
+  DESCUENTO_PORCENTAJE_DESC is not null and
+  DESCUENTO_TOPE            is not null
+  IF @@ERROR != 0
+  PRINT('SP DESCUENTO MEDIO PAGO FAIL!')
+  ELSE
+  PRINT('SP DESCUENTO MEDIO PAGO OK!')
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_empleado
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].empleado(id_sucursal, dni, nombre, apellido, telefono, mail, nacimiento, registro)
+  SELECT DISTINCT                        
+    suc.id_sucursal           as id_sucursal,
+    EMPLEADO_DNI              as dni,
+    EMPLEADO_NOMBRE           as nombre,
+    EMPLEADO_APELLIDO         as apellido,
+    EMPLEADO_TELEFONO         as telefono,
+    EMPLEADO_MAIL             as mail,
+    EMPLEADO_FECHA_NACIMIENTO as nacimiento,
+    EMPLEADO_FECHA_REGISTRO   as registro,
+  FROM gd_esquema.Maestra
+
+  JOIN supermercado sup ON SUPER_NOMBRE = sup.nombre
+  JOIN sucursal suc ON SUPER_NOMBRE = sup.nombre AND SUCURSAL_NOMBRE = suc.nombre
+
+  WHERE
+  EMPLEADO_DNI is not null and
+  EMPLEADO_NOMBRE is not null and
+  EMPLEADO_FECHA_REGISTRO is not null
+  IF @@ERROR != 0
+  PRINT('SP EMPLEADO FAIL!')
+  ELSE
+  PRINT('SP EMPLEADO OK!')
+END
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
