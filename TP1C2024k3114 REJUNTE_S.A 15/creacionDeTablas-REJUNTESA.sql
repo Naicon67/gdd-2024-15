@@ -1,4 +1,4 @@
-[GD1C2024]
+USE [GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -467,12 +467,12 @@ BEGIN
     REGLA_APLICA_MISMO_PROD         as mismo_producto
   FROM gd_esquema.Maestra
   WHERE 
-  REGLA_DESCRIPCION is not null and
-  REGLA_DESCUENTO_APLICABLE_PROD        is not null and
-  REGLA_CANT_APLICABLE_REGLA   is not null and
-  REGLA_CANT_APLICA_DESCUENTO        is not null and
-  REGLA_APLICA_MISMA_MARCA         is not null and
-  REGLA_APLICA_MISMO_PROD                is not null
+  REGLA_DESCRIPCION                 is not null and
+  REGLA_DESCUENTO_APLICABLE_PROD    is not null and
+  REGLA_CANT_APLICABLE_REGLA        is not null and
+  REGLA_CANT_APLICA_DESCUENTO       is not null and
+  REGLA_APLICA_MISMA_MARCA          is not null and
+  REGLA_APLICA_MISMO_PROD           is not null
   IF @@ERROR != 0
   PRINT('SP REGLA FAIL!')
   ELSE
@@ -492,7 +492,7 @@ BEGIN
     PROMOCION_FECHA_FIN     as fecha_final
   FROM gd_esquema.Maestra
   WHERE
-  PROMO_CODIGO			 is not null and
+  PROMO_CODIGO			     is not null and
   PROMOCION_DESCRIPCION  is not null and
   PROMOCION_FECHA_INICIO is not null and
   PROMOCION_FECHA_FIN    is not null
@@ -530,20 +530,20 @@ BEGIN
 	INSERT INTO [REJUNTESA].localidad(nombre, id_provincia)
 	(SELECT DISTINCT CLIENTE_LOCALIDAD, p.id_provincia FROM gd_esquema.Maestra
 	 JOIN provincia p on p.nombre = CLIENTE_PROVINCIA
-	 WHERE CLIENTE_LOCALIDAD is not null
-	 and CLIENTE_PROVINCIA is not null)
+	 WHERE CLIENTE_LOCALIDAD  is not null
+	 and CLIENTE_PROVINCIA    is not null)
     UNION 
   (SELECT DISTINCT SUPER_LOCALIDAD, p.id_provincia 
 	FROM gd_esquema.Maestra
 	 JOIN provincia p on p.nombre = SUPER_PROVINCIA
-	 WHERE SUPER_LOCALIDAD is not null
-	 and SUPER_PROVINCIA is not null)
+	 WHERE SUPER_LOCALIDAD  is not null
+	 and SUPER_PROVINCIA    is not null)
 	  UNION 
   (SELECT DISTINCT SUCURSAL_LOCALIDAD, p.id_provincia
 	 FROM gd_esquema.Maestra 
 	 JOIN REJUNTESA.provincia p on p.nombre = SUCURSAL_PROVINCIA
-	 WHERE SUCURSAL_LOCALIDAD is not null
-	 and SUCURSAL_PROVINCIA is not null)
+	 WHERE SUCURSAL_LOCALIDAD   is not null
+	 and SUCURSAL_PROVINCIA     is not null)
 	IF @@ERROR != 0
 	PRINT('SP LOCALIDAD FAIL!')
 	ELSE
@@ -657,8 +657,8 @@ BEGIN
     l.id_localidad      as id_localidad,
     p.id_provincia      as id_provincia
   FROM gd_esquema.Maestra
-  JOIN [REJUNTESA].localidad l on l.nombre = SUCURSAL_LOCALIDAD
-  JOIN [REJUNTESA].provincia p on p.id_provincia = l.id_provincia
+  JOIN [REJUNTESA].localidad l    on l.nombre = SUCURSAL_LOCALIDAD
+  JOIN [REJUNTESA].provincia p    on p.id_provincia = l.id_provincia
   JOIN [REJUNTESA].supermercado s on s.nombre = SUPER_NOMBRE
   WHERE
   SUCURSAL_NOMBRE    is not null and
@@ -678,15 +678,14 @@ CREATE PROCEDURE [REJUNTESA].migrar_caja
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].caja(nro_caja, id_sucursal,id_tipo_caja)
-
   SELECT DISTINCT
-	CAJA_NUMERO as nro_caja,
-	suc.id_sucursal as id_sucursal,
-	t.id_tipo_caja as id_tipo_caja
+	CAJA_NUMERO         as nro_caja,
+  suc.id_sucursal     as id_sucursal,
+	t.id_tipo_caja      as id_tipo_caja
   FROM gd_esquema.Maestra
 
-  JOIN tipo_caja t on CAJA_TIPO = t.nombre
-  JOIN sucursal suc on SUCURSAL_NOMBRE = suc.nombre
+  JOIN tipo_caja t      on CAJA_TIPO = t.nombre
+  JOIN sucursal suc     on SUCURSAL_NOMBRE = suc.nombre
   JOIN supermercado sup on SUPER_NOMBRE = sup.nombre
 
   WHERE CAJA_TIPO is not null and SUCURSAL_NOMBRE is not null
@@ -703,7 +702,7 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].detalle_pago(id_cliente, nro_tarjeta, vencimiento_tarjeta, cuotas)
   SELECT DISTINCT
-    c.id_cliente						 as id_cliente,                      
+    c.id_cliente						             as id_cliente,                      
     maestra_pago.PAGO_TARJETA_NRO        as nro_tarjeta,
     maestra_pago.PAGO_TARJETA_FECHA_VENC as vencimiento_tarjeta,
     maestra_pago.PAGO_TARJETA_CUOTAS     as cuotas
@@ -765,8 +764,8 @@ BEGIN
   JOIN sucursal suc ON SUPER_NOMBRE = sup.nombre AND SUCURSAL_NOMBRE = suc.nombre
 
   WHERE
-  EMPLEADO_DNI is not null and
-  EMPLEADO_NOMBRE is not null and
+  EMPLEADO_DNI            is not null and
+  EMPLEADO_NOMBRE         is not null and
   EMPLEADO_FECHA_REGISTRO is not null
   IF @@ERROR != 0
   PRINT('SP EMPLEADO FAIL!')
@@ -814,13 +813,13 @@ BEGIN
   FROM [GD1C2024].[gd_esquema].[Maestra]
 
   JOIN regla r ON
-	REGLA_APLICA_MISMA_MARCA = r.misma_marca AND
-	REGLA_APLICA_MISMO_PROD = r.mismo_producto AND
-	REGLA_CANT_APLICA_DESCUENTO = r.cantidad_aplicable_descuento AND
-	REGLA_CANT_APLICABLE_REGLA = r.cantidad_aplicable_regla AND
-	REGLA_CANT_MAX_PROD = r.veces_aplicable AND
-	REGLA_DESCRIPCION = r.descripcion AND
-	REGLA_DESCUENTO_APLICABLE_PROD = r.descuento
+	REGLA_APLICA_MISMA_MARCA        = r.misma_marca                   AND
+	REGLA_APLICA_MISMO_PROD         = r.mismo_producto                AND
+	REGLA_CANT_APLICA_DESCUENTO     = r.cantidad_aplicable_descuento  AND
+  REGLA_CANT_APLICABLE_REGLA      = r.cantidad_aplicable_regla      AND
+	REGLA_CANT_MAX_PROD             = r.veces_aplicable               AND
+	REGLA_DESCRIPCION               = r.descripcion                   AND
+	REGLA_DESCUENTO_APLICABLE_PROD  = r.descuento
 
   WHERE
   PROMO_CODIGO is not null
@@ -860,13 +859,13 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].envio(nro_ticket, id_cliente, fecha_programada, hora_rango_inicio, hora_rango_final, costo, estado, fecha_entrega)
   SELECT DISTINCT
-    TICKET_NUMERO		   as nro_ticket,
-	c.id_cliente		   as id_cliente,
+    TICKET_NUMERO		     as nro_ticket,
+	c.id_cliente		       as id_cliente,
 	ENVIO_FECHA_PROGRAMADA as fecha_programada,
-	ENVIO_HORA_INICIO	   as hora_rango_inicio,
-	ENVIO_HORA_FIN		   as hora_rango_final,
-	ENVIO_COSTO			   as costo,
-	ENVIO_ESTADO		   as estado,
+	ENVIO_HORA_INICIO	     as hora_rango_inicio,
+	ENVIO_HORA_FIN		     as hora_rango_final,
+	ENVIO_COSTO			       as costo,
+  ENVIO_ESTADO		       as estado,
 	ENVIO_FECHA_ENTREGA	   as fecha_entrega
   FROM [GD1C2024].[gd_esquema].[Maestra]
 
@@ -876,15 +875,73 @@ BEGIN
 	CLIENTE_FECHA_REGISTRO = c.registro
 
   WHERE
-	ENVIO_COSTO is not null AND
-	CLIENTE_DNI is not null AND
-	CLIENTE_NOMBRE is not null AND
-	CLIENTE_FECHA_REGISTRO is not null
+	ENVIO_COSTO             is not null AND
+	CLIENTE_DNI             is not null AND
+	CLIENTE_NOMBRE          is not null AND
+	CLIENTE_FECHA_REGISTRO  is not null
   IF @@ERROR != 0
   PRINT('SP ENVIO FAIL!')
   ELSE
   PRINT('SP ENVIO OK!')
 END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_venta
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].venta(nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
+  SELECT DISTINCT   
+    TICKET_NUMERO                      as nro_ticket,
+    s.id_sucursal                      as id_sucursal,
+    CAJA_NUMERO                        as nro_caja,
+    e.legajo_empleado                  as legajo_empleado,
+    TICKET_FECHA_HORA                  as fecha,
+    TICKET_TIPO_COMPROBANTE            as tipo_comprobante,
+    TICKET_SUBTOTAL_PRODUCTOS          as sub_total,
+    TICKET_TOTAL_DESCUENTO_APLICADO    as descuento_promociones,
+    TICKET_TOTAL_DESCUENTO_APLICADO_MP as descuento_medio,
+    TICKET_TOTAL_TICKET                as total
+  FROM gd_esquema.Maestra
+  JOIN sucursal s ON SUCURSAL_NOMBRE = s.nombre
+  JOIN localidad l ON l.id_localidad = s.id_localidad 
+  JOIN empleado e ON e.dni = EMPLEADO_DNI 
+  WHERE
+  TICKET_NUMERO          is not null and 
+  TICKET_FECHA_HORA      is not null and
+  TICKET_TOTAL_TICKET    is not null 
+
+  IF @@ERROR != 0
+  PRINT('SP VENTA FAIL!')
+  ELSE
+  PRINT('SP VENTA OK!')
+END
+
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_pago 
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].pago(nro_ticket, id_medio_pago, id_detalle_pago, fecha_pago, importe, descuento_aplicado)
+  SELECT DISTINCT      
+    REGLA_DESCRIPCION           as nro_ticket,
+    mp.id_medio_pago            as id_medio_pago,
+    dp.id_detalle_pago          as id_detalle_pago,
+    PAGO_FECHA                  as fecha_pago,
+    PAGO_IMPORTE                as importe,
+    PAGO_DESCUENTO_APLICADO     as descuento_aplicado
+  FROM gd_esquema.Maestra
+  JOIN MEDIO_PAGO mp ON mp.tipo = PAGO_TIPO_MEDIO_PAGO AND mp.nombre = PAGO_MEDIO_PAGO  
+  JOIN DETALLE_PAGO dp ON dp.nro_tarjeta = PAGO_TARJETA_NRO AND dp.cuotas = PAGO_TARJETA_CUOTAS AND dp.vencimiento_tarjeta = PAGO_TARJETA_FECHA_VENC
+  WHERE 
+  PAGO_IMPORTE                      is not null
+  IF @@ERROR != 0
+  PRINT('SP PAGO FAIL!')
+  ELSE
+  PRINT('SP PAGO OK!')
+END
+
+
+
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
@@ -947,6 +1004,13 @@ EXEC REJUNTESA.migrar_promocion_producto_x_regla
 GO
 EXEC REJUNTESA.migrar_descuento_x_medio_pago
 
+GO
+EXEC REJUNTESA.migrar_venta
+
+GO
+EXEC REJUNTESA.migrar_pago
+
+
 --GO
 --EXEC REJUNTESA.migrar_envio
 
@@ -971,3 +1035,5 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[detalle_pago];
 SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto_x_regla];
 SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_x_medio_pago];
 --SELECT * FROM [GD1C2024].[REJUNTESA].[envio];
+SELECT * FROM [GD1C2024].[REJUNTESA].[venta];
+SELECT * FROM [GD1C2024].[REJUNTESA].[pago];
