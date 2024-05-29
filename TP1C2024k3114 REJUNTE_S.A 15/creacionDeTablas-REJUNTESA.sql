@@ -1,4 +1,4 @@
- [GD1C2024]
+[GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -357,7 +357,7 @@ CREATE TABLE [REJUNTESA].[promocion_producto_x_regla] (
 );
 
 CREATE TABLE [REJUNTESA].[descuento_x_medio_pago] (
-  [id_medio_pago ] int,
+  [id_medio_pago] int,
   [cod_descuento] decimal(18,0),
   PRIMARY KEY ([id_medio_pago], [cod_descuento]),
   CONSTRAINT [FK_id_medio_pago_en_descuento_x_medio_pago.id_medio_pago]
@@ -803,6 +803,89 @@ BEGIN
   PRINT('SP PRODUCTO X PROMOCION_PRODUCTO OK!')
 END
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_promocion_producto_x_regla
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].promocion_producto_x_regla(cod_promocion, id_regla)
+  SELECT DISTINCT
+    PROMO_CODIGO   as cod_promocion,
+	r.id_regla	   as id_regla
+  FROM [GD1C2024].[gd_esquema].[Maestra]
+
+  JOIN regla r ON
+	REGLA_APLICA_MISMA_MARCA = r.misma_marca AND
+	REGLA_APLICA_MISMO_PROD = r.mismo_producto AND
+	REGLA_CANT_APLICA_DESCUENTO = r.cantidad_aplicable_descuento AND
+	REGLA_CANT_APLICABLE_REGLA = r.cantidad_aplicable_regla AND
+	REGLA_CANT_MAX_PROD = r.veces_aplicable AND
+	REGLA_DESCRIPCION = r.descripcion AND
+	REGLA_DESCUENTO_APLICABLE_PROD = r.descuento
+
+  WHERE
+  PROMO_CODIGO is not null
+  IF @@ERROR != 0
+  PRINT('SP PROMOCION_PRODUCTO X REGLA FAIL!')
+  ELSE
+  PRINT('SP PROMOCION_PRODUCTO X REGLA OK!')
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_descuento_x_medio_pago
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].descuento_x_medio_pago(id_medio_pago, cod_descuento)
+  SELECT DISTINCT
+    m.id_medio_pago  as id_medio_pago,
+	DESCUENTO_CODIGO as cod_descuento
+  FROM [GD1C2024].[gd_esquema].[Maestra]
+
+  JOIN medio_pago m ON
+	PAGO_MEDIO_PAGO = m.nombre AND
+	PAGO_TIPO_MEDIO_PAGO = m.tipo
+
+  WHERE
+	PAGO_MEDIO_PAGO is not null AND
+	PAGO_TIPO_MEDIO_PAGO is not null AND
+	DESCUENTO_CODIGO is not null
+  IF @@ERROR != 0
+  PRINT('SP DESCUENTO X MEDIO_PAGO FAIL!')
+  ELSE
+  PRINT('SP DESCUENTO X MEDIO_PAGO OK!')
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_envio
+AS 
+BEGIN
+  INSERT INTO [REJUNTESA].envio(nro_ticket, id_cliente, fecha_programada, hora_rango_inicio, hora_rango_final, costo, estado, fecha_entrega)
+  SELECT DISTINCT
+    TICKET_NUMERO		   as nro_ticket,
+	c.id_cliente		   as id_cliente,
+	ENVIO_FECHA_PROGRAMADA as fecha_programada,
+	ENVIO_HORA_INICIO	   as hora_rango_inicio,
+	ENVIO_HORA_FIN		   as hora_rango_final,
+	ENVIO_COSTO			   as costo,
+	ENVIO_ESTADO		   as estado,
+	ENVIO_FECHA_ENTREGA	   as fecha_entrega
+  FROM [GD1C2024].[gd_esquema].[Maestra]
+
+  JOIN cliente c ON
+	CLIENTE_DNI = c.dni AND
+	CLIENTE_NOMBRE = c.nombre AND
+	CLIENTE_FECHA_REGISTRO = c.registro
+
+  WHERE
+	ENVIO_COSTO is not null AND
+	CLIENTE_DNI is not null AND
+	CLIENTE_NOMBRE is not null AND
+	CLIENTE_FECHA_REGISTRO is not null
+  IF @@ERROR != 0
+  PRINT('SP ENVIO FAIL!')
+  ELSE
+  PRINT('SP ENVIO OK!')
+END
+
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
 -- INICIO: EJECUCION DE PROCEDURES.
@@ -858,6 +941,15 @@ EXEC REJUNTESA.migrar_detalle_pago
 --GO
 --EXEC REJUNTESA.migrar_producto_x_promocion_producto
 
+GO
+EXEC REJUNTESA.migrar_promocion_producto_x_regla
+
+GO
+EXEC REJUNTESA.migrar_descuento_x_medio_pago
+
+--GO
+--EXEC REJUNTESA.migrar_envio
+
 -- FIN: EJECUCION DE PROCEDURES.
 
 SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
@@ -876,3 +968,6 @@ SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_medio_pago];
 SELECT * FROM [GD1C2024].[REJUNTESA].[empleado];
 SELECT * FROM [GD1C2024].[REJUNTESA].[detalle_pago];
 --SELECT * FROM [GD1C2024].[REJUNTESA].[producto_x_promocion_producto];
+SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto_x_regla];
+SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_x_medio_pago];
+--SELECT * FROM [GD1C2024].[REJUNTESA].[envio];
