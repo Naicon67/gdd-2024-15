@@ -307,7 +307,8 @@ CREATE TABLE [REJUNTESA].[producto_vendido] (
   [id_producto] int,
   [cantidad] decimal(18,0),
   [precio_total] decimal(18,2),
-  PRIMARY KEY ([nro_ticket], [id_producto]),
+--   PRIMARY KEY ([nro_ticket], [id_producto]),
+  CONSTRAINT [UQ_nro_ticket_id_producto] UNIQUE ([nro_ticket], [id_producto]),
   CONSTRAINT [FK_id_producto.id_producto]
     FOREIGN KEY ([id_producto])
       REFERENCES [REJUNTESA].[producto]([id_producto]),
@@ -919,7 +920,7 @@ CREATE PROCEDURE [REJUNTESA].migrar_pago
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].pago(nro_ticket, id_medio_pago, id_detalle_pago, fecha_pago, importe, descuento_aplicado)
-  SELECT DISTINCT      
+  SELECT DISTINCT
     REGLA_DESCRIPCION           as nro_ticket,
     mp.id_medio_pago            as id_medio_pago,
     dp.id_detalle_pago          as id_detalle_pago,
