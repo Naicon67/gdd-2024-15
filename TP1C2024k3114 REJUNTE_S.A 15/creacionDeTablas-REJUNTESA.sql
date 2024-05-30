@@ -891,7 +891,7 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].venta(
     nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
-  SELECT DISTINCT  
+  SELECT TOP 1 WITH TIES  
     TICKET_NUMERO                      as nro_ticket, 
     s.id_sucursal                      as id_sucursal,
     CAJA_NUMERO                        as nro_caja,
@@ -909,7 +909,8 @@ BEGIN
   WHERE
   TICKET_NUMERO          is not null and 
   TICKET_FECHA_HORA      is not null and
-  TICKET_TOTAL_TICKET    is not null 
+  TICKET_TOTAL_TICKET    is not null
+  ORDER BY ROW_NUMBER() OVER(PARTITION BY [TICKET_NUMERO] ORDER BY [TICKET_NUMERO]);
 
   IF @@ERROR != 0
   PRINT('SP VENTA FAIL!')
@@ -947,19 +948,20 @@ CREATE PROCEDURE [REJUNTESA].migrar_producto_vendido
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
-  SELECT DISTINCT
+  SELECT
     TICKET_NUMERO               as nro_ticket,
     prod.id_producto            as id_producto,
-    TICKET_DET_CANTIDAD         as cantidad,
-    TICKET_DET_TOTAL            as precio_total
+    SUM(TICKET_DET_CANTIDAD)    as cantidad,
+    SUM(TICKET_DET_TOTAL)       as precio_total
   FROM gd_esquema.Maestra
   JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
   JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
 
   WHERE 
     TICKET_NUMERO                          is not null AND
-    TICKET_DET_CANTIDAD                    is not null 
-
+    TICKET_DET_CANTIDAD                    is not null AND
+	PRODUCTO_NOMBRE						   is not null
+  GROUP BY TICKET_NUMERO, prod.id_producto
   IF @@ERROR != 0
     PRINT('SP PRODUCTO VENDIDO FAIL!')
   ELSE
