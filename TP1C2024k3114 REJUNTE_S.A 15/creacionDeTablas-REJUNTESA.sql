@@ -888,7 +888,7 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].venta(
     nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
-  SELECT TOP 1 WITH TIES
+  SELECT TOP 1 WITH TIES  
     TICKET_NUMERO                      as nro_ticket, 
     s.id_sucursal                      as id_sucursal,
     CAJA_NUMERO                        as nro_caja,
@@ -945,154 +945,71 @@ CREATE PROCEDURE [REJUNTESA].migrar_producto_vendido
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
-  SELECT DISTINCT
+  SELECT
     TICKET_NUMERO               as nro_ticket,
     prod.id_producto            as id_producto,
-    TICKET_DET_CANTIDAD         as cantidad,
-    TICKET_DET_TOTAL            as precio_total
+    SUM(TICKET_DET_CANTIDAD)    as cantidad,
+    SUM(TICKET_DET_TOTAL)       as precio_total
   FROM gd_esquema.Maestra
   JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
-
-  WHERE 
-    TICKET_NUMERO                          is not null AND
-    TICKET_DET_CANTIDAD                    is not null 
-
-  IF @@ERROR != 0
-    PRINT('SP PRODUCTO VENDIDO FAIL!')
-  ELSE
-    PRINT('SP PRODUCTO VENDIDO OK!')
-END
-
-
-
-
-GO
-CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada 
-AS 
-BEGIN
-  INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
-  SELECT DISTINCT
-    TICKET_NUMERO                        as nro_ticket,
-    prod.id_producto                     as id_producto,
-    prom.cod_promocion                   as cod_promocion,
-    COALESCE(PAGO_DESCUENTO_APLICADO,0)  as descuento_total
-  FROM gd_esquema.Maestra
-  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN promocion_producto prom ON prom.cod_promocion = PROMO_CODIGO
-   
-   WHERE 
-  TICKET_NUMERO                          is not null AND
-  PRODUCTO_NOMBRE                        is not null AND
-  PAGO_DESCUENTO_APLICADO                is not null 
-
-  IF @@ERROR != 0
-  PRINT('SP PROMOCION APLICADA FAIL!')
-  ELSE
-  PRINT('SP PROMOCION APLICADA OK!')
-END
-
-GO
-CREATE PROCEDURE [REJUNTESA].migrar_producto_vendido
-AS 
-BEGIN
-  INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
-  SELECT DISTINCT
-    TICKET_NUMERO               as nro_ticket,
-    prod.id_producto            as id_producto,
-    TICKET_DET_CANTIDAD         as cantidad,
-    TICKET_DET_TOTAL            as precio_total
-  FROM gd_esquema.Maestra
-  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
-
-  WHERE 
-    TICKET_NUMERO                          is not null AND
-    TICKET_DET_CANTIDAD                    is not null 
-
-  IF @@ERROR != 0
-    PRINT('SP PRODUCTO VENDIDO FAIL!')
-  ELSE
-    PRINT('SP PRODUCTO VENDIDO OK!')
-END
-
-GO
-CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada 
-AS 
-BEGIN
-  INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
-  SELECT DISTINCT
-    TICKET_NUMERO                        as nro_ticket,
-    prod.id_producto                     as id_producto,
-    prom.cod_promocion                   as cod_promocion,
-    COALESCE(PAGO_DESCUENTO_APLICADO,0)  as descuento_total
-  FROM gd_esquema.Maestra
-  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN promocion_producto prom ON prom.cod_promocion = PROMO_CODIGO
-   
-   WHERE 
-  TICKET_NUMERO                          is not null AND
-  PRODUCTO_NOMBRE                        is not null AND
-  PAGO_DESCUENTO_APLICADO                is not null 
-
-  IF @@ERROR != 0
-  PRINT('SP PROMOCION APLICADA FAIL!')
-  ELSE
-  PRINT('SP PROMOCION APLICADA OK!')
-END
-
-
-
-GO
-CREATE PROCEDURE [REJUNTESA].migrar_producto_vendido
-AS 
-BEGIN
-  INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
-  SELECT DISTINCT
-    TICKET_NUMERO               as nro_ticket,
-    prod.id_producto            as id_producto,
-    TICKET_DET_CANTIDAD         as cantidad,
-    TICKET_DET_TOTAL            as precio_total
-  FROM gd_esquema.Maestra
-  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE 
   JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
 
   WHERE 
     TICKET_NUMERO                          is not null AND
     TICKET_DET_CANTIDAD                    is not null AND
-    PRODUCTO_NOMBRE                        is not null
-
+	PRODUCTO_NOMBRE						   is not null
+  GROUP BY TICKET_NUMERO, prod.id_producto
   IF @@ERROR != 0
     PRINT('SP PRODUCTO VENDIDO FAIL!')
   ELSE
     PRINT('SP PRODUCTO VENDIDO OK!')
 END
 
+-- Usando nuestras tablas (tiene muchos descuentos negativos)
+-- GO
+-- CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada
+-- AS
+-- BEGIN
+--   INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
+--   SELECT DISTINCT
+--     pv.nro_ticket                                   as nro_ticket,
+--     prod.id_producto                                as id_producto,
+--     prom.cod_promocion                              as cod_promocion,
+--     (pv.cantidad * prod.precio) - pv.precio_total   as descuento_total
+--   FROM [REJUNTESA].producto_vendido pv
+--   JOIN producto prod ON pv.id_producto = prod.id_producto
+--   JOIN producto_x_promocion_producto pxpp ON prod.id_producto = pxpp.id_producto
+--   JOIN promocion_producto prom ON prom.cod_promocion = pxpp.cod_promocion
+--
+--   IF @@ERROR != 0
+--   PRINT('SP PROMOCION APLICADA FAIL!')
+--   ELSE
+--   PRINT('SP PROMOCION APLICADA OK!')
+-- END
+
 GO
-CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada 
-AS 
+CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada
+AS
 BEGIN
   INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
   SELECT DISTINCT
-    TICKET_NUMERO                        as nro_ticket,
-    prod.id_producto                     as id_producto,
-    prom.cod_promocion                   as cod_promocion,
-    COALESCE(PAGO_DESCUENTO_APLICADO,0)  as descuento_total
-  FROM gd_esquema.Maestra
-  JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN promocion_producto prom ON prom.cod_promocion = PROMO_CODIGO
-   
-   WHERE 
-  TICKET_NUMERO                          is not null AND
-  PRODUCTO_NOMBRE                        is not null AND
-  PAGO_DESCUENTO_APLICADO                is not null 
+    pv.nro_ticket                                   as nro_ticket,
+    prod.id_producto                                as id_producto,
+    prom.cod_promocion                              as cod_promocion,
+    (pv.cantidad * prod.precio) - pv.precio_total   as descuento_total
+  FROM gd_esquema.Maestra M
+  JOIN REJUNTESA.producto prod ON prod.nombre = PRODUCTO_NOMBRE and prod.descripcion = PRODUCTO_DESCRIPCION and prod.precio = PRODUCTO_PRECIO
+  JOIN REJUNTESA.subcategoria s on prod.id_subcategoria = s.id_subcategoria
+  JOIN REJUNTESA.categoria c on c.id_categoria = s.id_categoria
+  JOIN REJUNTESA.producto_vendido pv on pv.id_producto = prod.id_producto
+  JOIN REJUNTESA.producto_x_promocion_producto pxpp ON prod.id_producto = pxpp.id_producto
+  JOIN REJUNTESA.promocion_producto prom ON prom.cod_promocion = pxpp.cod_promocion
 
   IF @@ERROR != 0
   PRINT('SP PROMOCION APLICADA FAIL!')
   ELSE
   PRINT('SP PROMOCION APLICADA OK!')
 END
-
 
 -- FIN: NORMALIZACION DE DATOS - STORED PROCEDURES.
 
