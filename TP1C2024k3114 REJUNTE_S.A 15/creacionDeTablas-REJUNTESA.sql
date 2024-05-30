@@ -775,7 +775,7 @@ CREATE PROCEDURE [REJUNTESA].migrar_producto_x_promocion_producto
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto_x_promocion_producto(id_producto, cod_promocion)
-  SELECT DISTINCT TOP (1000)                 
+  SELECT DISTINCT
     p.id_producto			   as id_producto,
     maestra_promo.PROMO_CODIGO as cod_promocion
   FROM [GD1C2024].[gd_esquema].[Maestra] as maestra_producto
@@ -949,7 +949,7 @@ BEGIN
     TICKET_NUMERO               as nro_ticket,
     prod.id_producto            as id_producto,
     SUM(TICKET_DET_CANTIDAD)    as cantidad,
-    SUM(TICKET_DET_TOTAL)       as precio_total
+    prod.precio *  SUM(TICKET_DET_CANTIDAD)     as precio_total
   FROM gd_esquema.Maestra
   JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
   JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
@@ -958,34 +958,12 @@ BEGIN
     TICKET_NUMERO                          is not null AND
     TICKET_DET_CANTIDAD                    is not null AND
 	PRODUCTO_NOMBRE						   is not null
-  GROUP BY TICKET_NUMERO, prod.id_producto
+  GROUP BY TICKET_NUMERO, prod.id_producto, prod.precio
   IF @@ERROR != 0
     PRINT('SP PRODUCTO VENDIDO FAIL!')
   ELSE
     PRINT('SP PRODUCTO VENDIDO OK!')
 END
-
--- Usando nuestras tablas (tiene muchos descuentos negativos)
--- GO
--- CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada
--- AS
--- BEGIN
---   INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
---   SELECT DISTINCT
---     pv.nro_ticket                                   as nro_ticket,
---     prod.id_producto                                as id_producto,
---     prom.cod_promocion                              as cod_promocion,
---     (pv.cantidad * prod.precio) - pv.precio_total   as descuento_total
---   FROM [REJUNTESA].producto_vendido pv
---   JOIN producto prod ON pv.id_producto = prod.id_producto
---   JOIN producto_x_promocion_producto pxpp ON prod.id_producto = pxpp.id_producto
---   JOIN promocion_producto prom ON prom.cod_promocion = pxpp.cod_promocion
---
---   IF @@ERROR != 0
---   PRINT('SP PROMOCION APLICADA FAIL!')
---   ELSE
---   PRINT('SP PROMOCION APLICADA OK!')
--- END
 
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_promocion_aplicada
@@ -993,18 +971,19 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].promocion_aplicada(nro_ticket, id_producto, cod_promocion, descuento_total)
   SELECT DISTINCT
-    pv.nro_ticket                                   as nro_ticket,
+    TICKET_NUMERO                                  as nro_ticket,
     prod.id_producto                                as id_producto,
-    prom.cod_promocion                              as cod_promocion,
-    (pv.cantidad * prod.precio) - pv.precio_total   as descuento_total
+    PROMO_CODIGO                             as cod_promocion,
+    SUM(PROMO_APLICADA_DESCUENTO)                        as descuento_total
   FROM gd_esquema.Maestra M
   JOIN REJUNTESA.producto prod ON prod.nombre = PRODUCTO_NOMBRE and prod.descripcion = PRODUCTO_DESCRIPCION and prod.precio = PRODUCTO_PRECIO
   JOIN REJUNTESA.subcategoria s on prod.id_subcategoria = s.id_subcategoria
   JOIN REJUNTESA.categoria c on c.id_categoria = s.id_categoria
-  JOIN REJUNTESA.producto_vendido pv on pv.id_producto = prod.id_producto
-  JOIN REJUNTESA.producto_x_promocion_producto pxpp ON prod.id_producto = pxpp.id_producto
-  JOIN REJUNTESA.promocion_producto prom ON prom.cod_promocion = pxpp.cod_promocion
+  where PROMO_APLICADA_DESCUENTO is not null and
+        TICKET_NUMERO is not null and
+        PROMO_CODIGO is not null
 
+group by TICKET_NUMERO, prod.id_producto, PROMO_CODIGO
   IF @@ERROR != 0
   PRINT('SP PROMOCION APLICADA FAIL!')
   ELSE
@@ -1082,38 +1061,10 @@ GO
 EXEC REJUNTESA.migrar_producto_vendido
 
 GO
-EXEC REJUNTESA.migrar_promocion_aplicada
+EXEC REJUNTESA.migrar_envio
 
 GO
-EXEC REJUNTESA.migrar_envio
+EXEC REJUNTESA.migrar_promocion_aplicada
 
 -- FIN: EJECUCION DE PROCEDURES.
 
-SELECT * FROM [GD1C2024].[REJUNTESA].[tipo_caja];
-SELECT * FROM [GD1C2024].[REJUNTESA].[categoria];
-SELECT * FROM [GD1C2024].[REJUNTESA].[subcategoria];
-SELECT * FROM [GD1C2024].[REJUNTESA].[producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[regla];
-SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[localidad];
-SELECT * FROM [GD1C2024].[REJUNTESA].[provincia];
-SELECT * FROM [GD1C2024].[REJUNTESA].[cliente];
-SELECT * FROM [GD1C2024].[REJUNTESA].[supermercado];
-SELECT * FROM [GD1C2024].[REJUNTESA].[sucursal];
-SELECT * FROM [GD1C2024].[REJUNTESA].[caja];
-SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_medio_pago];
-SELECT * FROM [GD1C2024].[REJUNTESA].[empleado];
-SELECT * FROM [GD1C2024].[REJUNTESA].[detalle_pago];
---SELECT * FROM [GD1C2024].[REJUNTESA].[producto_x_promocion_producto];
-SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_producto_x_regla];
-SELECT * FROM [GD1C2024].[REJUNTESA].[descuento_x_medio_pago];
---SELECT * FROM [GD1C2024].[REJUNTESA].[envio];
-SELECT * FROM [GD1C2024].[REJUNTESA].[venta];
-SELECT * FROM [GD1C2024].[REJUNTESA].[pago];
-
-
-SELECT * FROM [GD1C2024].[REJUNTESA].[venta]
-SELECT * FROM [GD1C2024].[REJUNTESA].[pago]
-SELECT * FROM [GD1C2024].[REJUNTESA].[producto_vendido]
-SELECT * FROM [GD1C2024].[REJUNTESA].[promocion_aplicada]
-SELECT * FROM [GD1C2024].[REJUNTESA].[envio]
