@@ -1,4 +1,4 @@
-﻿USE [GD1C2024]
+USE [GD1C2024]
 GO
 
 -- Borra todas las FKs
@@ -856,14 +856,14 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].envio(nro_ticket, id_cliente, fecha_programada, hora_rango_inicio, hora_rango_final, costo, estado, fecha_entrega)
   SELECT DISTINCT
-    TICKET_NUMERO		     as nro_ticket,
-	c.id_cliente		       as id_cliente,
-	ENVIO_FECHA_PROGRAMADA as fecha_programada,
-	ENVIO_HORA_INICIO	     as hora_rango_inicio,
-	ENVIO_HORA_FIN		     as hora_rango_final,
-	ENVIO_COSTO			       as costo,
-  ENVIO_ESTADO		       as estado,
-	ENVIO_FECHA_ENTREGA	   as fecha_entrega
+    TICKET_NUMERO		    as nro_ticket,
+	c.id_cliente		    as id_cliente,
+	ENVIO_FECHA_PROGRAMADA	as fecha_programada,
+	ENVIO_HORA_INICIO	    as hora_rango_inicio,
+	ENVIO_HORA_FIN		    as hora_rango_final,
+	ENVIO_COSTO			    as costo,
+	ENVIO_ESTADO		    as estado,
+	ENVIO_FECHA_ENTREGA	    as fecha_entrega
   FROM [GD1C2024].[gd_esquema].[Maestra]
 
   JOIN cliente c ON
@@ -946,13 +946,12 @@ AS
 BEGIN
   INSERT INTO [REJUNTESA].producto_vendido(nro_ticket, id_producto, cantidad, precio_total)
   SELECT
-    TICKET_NUMERO               as nro_ticket,
-    prod.id_producto            as id_producto,
-    SUM(TICKET_DET_CANTIDAD)    as cantidad,
+    TICKET_NUMERO								as nro_ticket,
+    prod.id_producto							as id_producto,
+    SUM(TICKET_DET_CANTIDAD)					as cantidad,
     prod.precio *  SUM(TICKET_DET_CANTIDAD)     as precio_total
   FROM gd_esquema.Maestra
   JOIN producto prod ON prod.nombre = PRODUCTO_NOMBRE
-  JOIN venta vent ON vent.nro_ticket = TICKET_NUMERO
 
   WHERE 
     TICKET_NUMERO                          is not null AND
@@ -1067,4 +1066,3 @@ GO
 EXEC REJUNTESA.migrar_promocion_aplicada
 
 -- FIN: EJECUCION DE PROCEDURES.
-
