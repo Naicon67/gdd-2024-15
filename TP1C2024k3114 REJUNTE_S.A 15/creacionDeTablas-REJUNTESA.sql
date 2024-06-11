@@ -242,9 +242,6 @@ CREATE TABLE [REJUNTESA].[empleado] (
 
 CREATE TABLE [REJUNTESA].[venta] (
   [nro_ticket] decimal(18,0),
-  [id_sucursal] int,
-  [nro_caja] decimal(18,0),
-  [legajo_empleado] int,
   [fecha] datetime,
   [tipo_comprobante] nvarchar(255),
   [sub_total] decimal(18,2),
@@ -252,21 +249,15 @@ CREATE TABLE [REJUNTESA].[venta] (
   [descuento_medio] decimal(18,2),
   [total] decimal(18,2),
   [total_costo_envios] decimal(18,2),
-  PRIMARY KEY ([nro_ticket]),
-  CONSTRAINT [FK_id_sucursal_en_venta.id_sucursal]
-    FOREIGN KEY ([id_sucursal])
-      REFERENCES [REJUNTESA].[sucursal]([id_sucursal]),
-  CONSTRAINT [FK_venta_nro_caja_id_sucursal]
-    FOREIGN KEY ([nro_caja], [id_sucursal])
-      REFERENCES [REJUNTESA].[caja]([nro_caja], [id_sucursal]),
-  CONSTRAINT [FK_legajo_empleado.legajo_empleado]
-    FOREIGN KEY ([legajo_empleado])
-      REFERENCES [REJUNTESA].[empleado]([legajo_empleado])
+  PRIMARY KEY ([nro_ticket])
 );
 
 CREATE TABLE [REJUNTESA].[pago] (
   [nro_pago] int IDENTITY(1,1),
   [nro_ticket] decimal(18,0),
+  [nro_caja] decimal(18,0),
+  [id_sucursal] int,
+  [legajo_empleado] int,
   [id_medio_pago] int,
   [id_detalle_pago] int,
   [fecha_pago] datetime,
@@ -276,6 +267,12 @@ CREATE TABLE [REJUNTESA].[pago] (
   CONSTRAINT [FK_nro_ticket.nro_ticket]
     FOREIGN KEY ([nro_ticket])
       REFERENCES [REJUNTESA].[venta]([nro_ticket]),
+  CONSTRAINT [FK_nro_caja_en_pago.nro_caja]
+    FOREIGN KEY ([nro_caja],[id_sucursal])
+      REFERENCES [REJUNTESA].[caja]([nro_caja],[id_sucursal]),
+  CONSTRAINT [FK_empleado_en_pago.legajo_empleado]
+    FOREIGN KEY ([legajo_empleado])
+      REFERENCES [REJUNTESA].[empleado]([legajo_empleado]),
   CONSTRAINT [FK_id_medio_pago.id_medio_pago]
     FOREIGN KEY ([id_medio_pago])
       REFERENCES [REJUNTESA].[medio_pago]([id_medio_pago]),
@@ -908,16 +905,13 @@ BEGIN
   PRINT('SP ENVIO OK!')
 END
 
-GO
+GO -- REVISAR
 CREATE PROCEDURE [REJUNTESA].migrar_venta
 AS 
 BEGIN
-  INSERT INTO [REJUNTESA].venta(nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total, total_costo_envios)
+  INSERT INTO [REJUNTESA].venta(nro_ticket, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total, total_costo_envios)
   SELECT TOP 1 WITH TIES  
-    TICKET_NUMERO                      as nro_ticket, 
-    s.id_sucursal                      as id_sucursal,
-    CAJA_NUMERO                        as nro_caja,
-    e.legajo_empleado                  as legajo_empleado,
+    TICKET_NUMERO                      as nro_ticket,
     TICKET_FECHA_HORA                  as fecha,
     TICKET_TIPO_COMPROBANTE            as tipo_comprobante,
     TICKET_SUBTOTAL_PRODUCTOS          as sub_total,
@@ -926,9 +920,7 @@ BEGIN
     TICKET_TOTAL_TICKET                as total,
     ENVIO_COSTO as total_costo_envios
   FROM gd_esquema.Maestra
-  JOIN supermercado sup ON SUPER_NOMBRE = sup.nombre
-  JOIN sucursal s ON SUCURSAL_NOMBRE = s.nombre AND SUPER_NOMBRE = sup.nombre
-  JOIN empleado e ON e.dni = EMPLEADO_DNI 
+  
   WHERE
   TICKET_NUMERO          is not null and 
   TICKET_FECHA_HORA      is not null and
@@ -946,24 +938,34 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_pago 
 AS 
 BEGIN
-  INSERT INTO [REJUNTESA].pago(nro_ticket, id_medio_pago, id_detalle_pago, fecha_pago, importe, descuento_aplicado)
+  INSERT INTO [REJUNTESA].pago(nro_ticket, nro_caja, id_sucursal, legajo_empleado, id_medio_pago, id_detalle_pago, fecha_pago, importe, descuento_aplicado)
   
   SELECT
-    TICKET_NUMERO           as nro_ticket,
-    mp.id_medio_pago        as id_medio_pago,
-    dp.id_detalle_pago      as id_detalle_pago,
-    PAGO_FECHA              as fecha_pago,
-    PAGO_IMPORTE            as importe,
-    PAGO_DESCUENTO_APLICADO as descuento_aplicado
+    TICKET_NUMERO                as nro_ticket,
+    MAX(CAJA_NUMERO)             as nro_caja,
+    MAX(s.id_sucursal)           as id_sucursal,
+    MAX(e.legajo_empleado)       as legajo_empleado,
+    MAX(mp.id_medio_pago)        as id_medio_pago,
+    MAX(dp.id_detalle_pago)      as id_detalle_pago,
+    MAX(PAGO_FECHA)              as fecha_pago,
+    MAX(PAGO_IMPORTE)            as importe,
+    MAX(PAGO_DESCUENTO_APLICADO) as descuento_aplicado
   FROM [GD1C2024].[gd_esquema].[Maestra]
 
-  JOIN [GD1C2024].REJUNTESA.medio_pago mp ON mp.nombre = PAGO_MEDIO_PAGO
-  LEFT OUTER JOIN DETALLE_PAGO dp ON
-    dp.nro_tarjeta = PAGO_TARJETA_NRO AND
-    dp.cuotas = PAGO_TARJETA_CUOTAS AND
-    dp.vencimiento_tarjeta = PAGO_TARJETA_FECHA_VENC
+  JOIN REJUNTESA.supermercado sup ON SUPER_NOMBRE = sup.nombre
+  JOIN REJUNTESA.sucursal s ON SUCURSAL_NOMBRE = s.nombre AND SUPER_NOMBRE = sup.nombre
+  LEFT OUTER JOIN REJUNTESA.empleado e ON e.dni = EMPLEADO_DNI
+  LEFT OUTER JOIN [GD1C2024].REJUNTESA.medio_pago mp ON mp.nombre = PAGO_MEDIO_PAGO
+  LEFT OUTER JOIN REJUNTESA.detalle_pago dp ON
+      dp.nro_tarjeta = PAGO_TARJETA_NRO AND
+      dp.cuotas = PAGO_TARJETA_CUOTAS AND
+      dp.vencimiento_tarjeta = PAGO_TARJETA_FECHA_VENC
 
-  WHERE PAGO_IMPORTE is not null
+  WHERE (PAGO_IMPORTE is not null OR CAJA_NUMERO is not null)
+
+  GROUP BY TICKET_NUMERO, TICKET_TOTAL_TICKET
+
+  ORDER BY TICKET_NUMERO
 
   IF @@ERROR != 0
   PRINT('SP PAGO FAIL!')
