@@ -251,6 +251,7 @@ CREATE TABLE [REJUNTESA].[venta] (
   [descuento_promociones] decimal(18,2),
   [descuento_medio] decimal(18,2),
   [total] decimal(18,2),
+  [total_costo_envios] decimal(18,2),
   PRIMARY KEY ([nro_ticket]),
   CONSTRAINT [FK_id_sucursal_en_venta.id_sucursal]
     FOREIGN KEY ([id_sucursal])
@@ -432,20 +433,27 @@ CREATE PROCEDURE [REJUNTESA].migrar_producto
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto(id_subcategoria, nombre, descripcion, precio, marca)
+  
   SELECT DISTINCT
-    sc.id_subcategoria    as id_subcategoria,
+    s.id_subcategoria     as id_subcategoria,
     PRODUCTO_NOMBRE       as nombre,
     PRODUCTO_DESCRIPCION  as descripcion,
     PRODUCTO_PRECIO       as precio,
     PRODUCTO_MARCA        as marca
   FROM gd_esquema.Maestra
-  JOIN subcategoria sc ON sc.subcategoria = PRODUCTO_SUB_CATEGORIA
+
+  JOIN REJUNTESA.categoria c ON PRODUCTO_CATEGORIA = c.categoria
+  JOIN REJUNTESA.subcategoria s ON
+      s.subcategoria = PRODUCTO_SUB_CATEGORIA AND
+      s.id_categoria = c.id_categoria
+
   WHERE 
-  PRODUCTO_SUB_CATEGORIA  is not null and
-  PRODUCTO_NOMBRE         is not null and
-  PRODUCTO_DESCRIPCION    is not null and
-  PRODUCTO_PRECIO         is not null and
-  PRODUCTO_MARCA          is not null
+      PRODUCTO_SUB_CATEGORIA  is not null and
+      PRODUCTO_NOMBRE         is not null and
+      PRODUCTO_DESCRIPCION    is not null and
+      PRODUCTO_PRECIO         is not null and
+      PRODUCTO_MARCA          is not null
+
   IF @@ERROR != 0
   PRINT('SP PRODUCTO FAIL!')
   ELSE
@@ -788,29 +796,29 @@ BEGIN
   PRINT('SP EMPLEADO OK!')
 END
 
-GO -- REVISAR
+GO
 CREATE PROCEDURE [REJUNTESA].migrar_producto_x_promocion_producto
 AS 
 BEGIN
   INSERT INTO [REJUNTESA].producto_x_promocion_producto(id_producto, cod_promocion)
+  
   SELECT DISTINCT
-    p.id_producto			   as id_producto,
-    maestra_promo.PROMO_CODIGO as cod_promocion
-  FROM [GD1C2024].[gd_esquema].[Maestra] as maestra_producto
+    p.id_producto as id_producto,
+    PROMO_CODIGO  as cod_promocion
+  FROM gd_esquema.Maestra
 
-  JOIN [GD1C2024].[gd_esquema].[Maestra] as maestra_promo ON maestra_promo.TICKET_NUMERO = maestra_producto.TICKET_NUMERO
-  JOIN categoria cat ON maestra_producto.PRODUCTO_CATEGORIA = cat.categoria
-  JOIN subcategoria sub ON maestra_producto.PRODUCTO_SUB_CATEGORIA = sub.subcategoria
-  JOIN producto p ON 
-	maestra_producto.PRODUCTO_NOMBRE = p.nombre AND
-	maestra_producto.PRODUCTO_DESCRIPCION = p.descripcion AND
-	maestra_producto.PRODUCTO_PRECIO= p.precio AND
-	maestra_producto.PRODUCTO_MARCA= p.marca AND
-	maestra_producto.PRODUCTO_CATEGORIA= cat.categoria AND
-	maestra_producto.PRODUCTO_SUB_CATEGORIA= sub.subcategoria
+  JOIN REJUNTESA.categoria c ON PRODUCTO_CATEGORIA = c.categoria
+    JOIN REJUNTESA.subcategoria s ON
+        s.subcategoria = PRODUCTO_SUB_CATEGORIA AND
+        s.id_categoria = c.id_categoria
+        JOIN REJUNTESA.producto p ON
+          s.id_subcategoria = p.id_subcategoria AND
+          PRODUCTO_NOMBRE = p.nombre AND
+          PRODUCTO_PRECIO = p.precio AND
+          PRODUCTO_DESCRIPCION = p.descripcion AND
+          PRODUCTO_MARCA = p.marca
 
-  WHERE
-  maestra_producto.PROMO_CODIGO is not null AND maestra_promo.PROMO_CODIGO is not null
+  WHERE PROMO_CODIGO is not null
   IF @@ERROR != 0
   PRINT('SP PRODUCTO X PROMOCION_PRODUCTO FAIL!')
   ELSE
@@ -904,7 +912,7 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_venta
 AS 
 BEGIN
-  INSERT INTO [REJUNTESA].venta(nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total)
+  INSERT INTO [REJUNTESA].venta(nro_ticket, id_sucursal, nro_caja, legajo_empleado, fecha, tipo_comprobante, sub_total, descuento_promociones, descuento_medio, total, total_costo_envios)
   SELECT TOP 1 WITH TIES  
     TICKET_NUMERO                      as nro_ticket, 
     s.id_sucursal                      as id_sucursal,
@@ -915,7 +923,8 @@ BEGIN
     TICKET_SUBTOTAL_PRODUCTOS          as sub_total,
     TICKET_TOTAL_DESCUENTO_APLICADO    as descuento_promociones,
     TICKET_TOTAL_DESCUENTO_APLICADO_MP as descuento_medio,
-    TICKET_TOTAL_TICKET                as total
+    TICKET_TOTAL_TICKET                as total,
+    ENVIO_COSTO as total_costo_envios
   FROM gd_esquema.Maestra
   JOIN supermercado sup ON SUPER_NOMBRE = sup.nombre
   JOIN sucursal s ON SUCURSAL_NOMBRE = s.nombre AND SUPER_NOMBRE = sup.nombre
@@ -1035,7 +1044,10 @@ GO
 EXEC REJUNTESA.migrar_promocion_producto
 
 GO
-EXEC REJUNTESA.migrar_medio_pago
+EXEC REJUNTESA.migrar_promocion_producto_x_regla
+
+GO
+EXEC REJUNTESA.migrar_producto_x_promocion_producto
 
 GO
 EXEC REJUNTESA.migrar_provincia
@@ -1059,16 +1071,19 @@ GO
 EXEC REJUNTESA.migrar_descuento_medio_pago
 
 GO
-EXEC REJUNTESA.migrar_empleado
-
-GO
-EXEC REJUNTESA.migrar_promocion_producto_x_regla
+EXEC REJUNTESA.migrar_medio_pago
 
 GO
 EXEC REJUNTESA.migrar_descuento_x_medio_pago
 
 GO
+EXEC REJUNTESA.migrar_empleado
+
+GO
 EXEC REJUNTESA.migrar_venta
+
+GO
+EXEC REJUNTESA.migrar_envio
 
 GO
 EXEC REJUNTESA.migrar_detalle_pago
@@ -1077,15 +1092,9 @@ GO
 EXEC REJUNTESA.migrar_pago
 
 GO
-EXEC REJUNTESA.migrar_envio
-
-GO
 EXEC REJUNTESA.migrar_producto_vendido
 
 GO
 EXEC REJUNTESA.migrar_promocion_aplicada
-
-GO
-EXEC REJUNTESA.migrar_producto_x_promocion_producto
 
 -- FIN: EJECUCION DE PROCEDURES.
