@@ -414,3 +414,113 @@ BEGIN
     ELSE
     PRINT('SP BI Producto OK!')
 END*/
+USE [GD1C2024]
+GO
+
+CREATE PROCEDURE [REJUNTESA].migrar_BI_producto_venidido
+AS
+BEGIN
+
+    INSERT INTO [REJUNTESA].BI_producto_vendido (id_venta, id_producto,cantidad,precio_total,descuento_promo,precio_unitario,id_categoria,id_subcategoria)
+  
+	SELECT 
+
+	pv.id_venta,
+	pv.id_producto,
+	pv.cantidad,
+	v.total, -- o sub_total?	
+	v.descuento_promociones,
+	p.precio,
+	c.id_categoria,
+	sc.id_categoria
+
+	from [REJUNTESA].producto_vendido pv
+	join [REJUNTESA].venta v on pv.id_venta = v.id_venta 
+	join [REJUNTESA].producto p on pv.id_producto = p.id_producto  
+	join [REJUNTESA].subcategoria sc on sc.id_subcategoria = p.id_subcategoria
+	join [REJUNTESA].categoria c on c.id_categoria = sc.id_categoria
+
+END
+
+
+CREATE FUNCTION calcular_edad(@fecha_nacimiento DATE)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @edad INT;
+    SET @edad = DATEDIFF(YEAR, @fecha_nacimiento, GETDATE());
+    RETURN @edad;
+END;
+
+CREATE FUNCTION obtener_rango_etario(@id_cliente int)
+RETURNS INT
+AS
+BEGIN
+	--DECLARE @re_id INT
+	DECLARE @edad INT
+
+	--SELECT @re_id = re.id_rango_etario  from [REJUNTESA].BI_rango_etario re
+	--JOIN cliente c ON c.dni = @id_cliente
+	
+	 SELECT @edad = dbo.calcular_edad(c.nacimiento) from Cliente c
+	 WHERE c.dni = @id_cliente
+
+	 RETURN 
+	 CASE
+        WHEN @edad < 25 THEN 0
+        WHEN @edad BETWEEN 25 AND 35 THEN 1
+        WHEN @edad BETWEEN 35 AND 50 THEN 2
+        WHEN @edad > 50 THEN 3 END
+	
+END
+
+
+CREATE PROCEDURE [REJUNTESA].migrar_envio
+AS
+BEGIN
+
+ INSERT INTO [REJUNTESA].BI_envio (id_envio, fecha_cumplida, id_sucursal, id_tiempo, id_rango_cliente, id_ubicacion_destino, costo)
+  
+  SELECT 
+  e.id_envio, 
+  e.fecha_entrega,
+  v.id_sucursal,
+  1, -- ??
+  dbo.obtener_rango_etario(c.dni),
+  u.id_localidad,
+  e.costo
+
+  FROM [REJUNTESA].envio e
+  JOIN [REJUNTESA].venta v ON v.id_venta = e.id_venta
+  JOIN [REJUNTESA].cliente c ON e.id_cliente = c.dni
+  JOIN [REJUNTESA].sucursal s ON s.id_sucursal = v.id_sucursal
+  JOIN [REJUNTESA].ubicacion u ON s.id_localidad = u.id_localidad and s.id_provincia = u.id_provincia
+
+END
+
+
+
+	CREATE PROCEDURE [REJUNTESA].migrar_BI_pago
+AS
+BEGIN
+
+    INSERT INTO [REJUNTESA].BI_pago(nro_pago, id_medio_pago, cuotas, id_tiempo, importe, decuento_medio, id_sucursal, id_rango_cliente, id_venta)
+	SELECT 
+	p.nro_pago,
+	p.id_medio_pago,
+	isnull(dp.cuotas, 0),
+	1, -- ??
+	p.importe,
+	v.descuento_medio,
+	v.id_sucursal, 
+	dbo.obtener_rango_etario(dp.id_cliente),
+	v.id_venta
+	FROM [REJUNTESA].pago p
+
+	JOIN [REJUNTESA].medio_pago mp on mp.id_medio_pago = p.id_medio_pago
+	JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
+	JOIN [REJUNTESA].descuento_x_medio_pago dxmp on dxmp.id_medio_pago = mp.id_medio_pago
+	JOIN [REJUNTESA].descuento_medio_pago dmp on dxmp.cod_descuento = dmp.cod_descuento
+	JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
+
+END
