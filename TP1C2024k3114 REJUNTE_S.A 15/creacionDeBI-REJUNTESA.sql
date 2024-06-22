@@ -49,7 +49,7 @@ CREATE TABLE REJUNTESA.BI_sucursal (
     PRIMARY KEY (id_sucursal),
     CONSTRAINT [FK_id_ubicacion_en_BI_sucursal.id_ubicacion]
     FOREIGN KEY ([id_ubicacion])
-      REFERENCES [REJUNTESA].[BI_ubicacion]([id_ubicacion])
+      REFERENCES [REJUNTESA].[BI_ubicacion]([id_localidad])
 );
 
 -- Crea dimension Categoria/Subcategoria
@@ -106,7 +106,7 @@ CREATE TABLE REJUNTESA.BI_venta (
     PRIMARY KEY (id_venta),
     CONSTRAINT [FK_id_ubicacion_en_BI_venta.id_ubicacion]
         FOREIGN KEY ([id_ubicacion])
-        REFERENCES [REJUNTESA].[BI_ubicacion]([id_ubicacion]),
+        REFERENCES [REJUNTESA].[BI_ubicacion]([id_localidad]),
     CONSTRAINT [FK_id_tiempo_en_BI_venta.id_tiempo]
         FOREIGN KEY ([id_tiempo])
         REFERENCES [REJUNTESA].[BI_tiempo]([id_tiempo]),
@@ -167,7 +167,7 @@ CREATE TABLE REJUNTESA.BI_envio (
         REFERENCES [REJUNTESA].[BI_rango_etario]([id_rango_etario]),
     CONSTRAINT [FK_id_ubicacion_destino_en_BI_envio.id_ubicacion_destino]
         FOREIGN KEY ([id_ubicacion_destino])
-        REFERENCES [REJUNTESA].[BI_ubicacion]([id_ubicacion])
+        REFERENCES [REJUNTESA].[BI_ubicacion]([id_localidad])
 );
 
 -- Crea tabla Pago
@@ -199,36 +199,29 @@ CREATE TABLE REJUNTESA.BI_pago (
         REFERENCES [REJUNTESA].[BI_venta]([id_venta])
 );
 
-
-
-
-
-
-
+-- Migraciones
 
 GO 
-CREATE PROCEDURE [REJUNTESA].migrar_bi_rango_etario
+CREATE PROCEDURE [REJUNTESA].migrar_BI_rango_etario
 AS 
 BEGIN
-	INSERT INTO [REJUNTESA].rango_etario_usuario_bi(fecha_base, fecha_limite) VALUES(0,25)
-	INSERT INTO [REJUNTESA].rango_etario_usuario_bi(fecha_base, fecha_limite) VALUES(25,35)
-	INSERT INTO [REJUNTESA].rango_etario_usuario_bi(fecha_base, fecha_limite) VALUES(35,50)
-	INSERT INTO [REJUNTESA].rango_etario_usuario_bi(fecha_base, fecha_limite) VALUES(50,100)
+	INSERT INTO [REJUNTESA].BI_rango_etario(edad_min, edad_max) VALUES(0,25)
+	INSERT INTO [REJUNTESA].BI_rango_etario(edad_min, edad_max) VALUES(25,35)
+	INSERT INTO [REJUNTESA].BI_rango_etario(edad_min, edad_max) VALUES(35,50)
+	INSERT INTO [REJUNTESA].BI_rango_etario(edad_min, edad_max) VALUES(50,200)
 	IF @@ERROR != 0
 	PRINT('SP RANGO ETARIO BI FAIL!')
 	ELSE
 	PRINT('SP RANGO ETARIO BI OK!')
 END
 
-
-
 GO
-CREATE PROCEDURE [REJUNTESA].migrar_bi_rango_horario
+CREATE PROCEDURE [REJUNTESA].migrar_BI_rango_horario
 AS 
 BEGIN
-	INSERT INTO [REJUNTESA].BI_turno(hora_desde, hora_hasta) VALUES('8','12')
-	INSERT INTO [REJUNTESA].BI_turno(hora_desde, hora_hasta) VALUES('12','16')
-	INSERT INTO [REJUNTESA].BI_turno(hora_desde, hora_hasta) VALUES('16','20')
+	INSERT INTO [REJUNTESA].BI_turno(inicio_turno, fin_turno) VALUES(8,12)
+	INSERT INTO [REJUNTESA].BI_turno(inicio_turno, fin_turno) VALUES(12,16)
+	INSERT INTO [REJUNTESA].BI_turno(inicio_turno, fin_turno) VALUES(16,20)
 	IF @@ERROR != 0
 	PRINT('SP RANGO HORARIO BI FAIL!')
 	ELSE
@@ -236,17 +229,32 @@ BEGIN
 END
 GO
 
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_provincia
+AS 
+BEGIN
+	INSERT INTO [REJUNTESA].BI_provincia(id_provincia, nombre)
+	SELECT
+		id_provincia,
+        nombre
+	FROM REJUNTESA.provincia
+	IF @@ERROR != 0
+	PRINT('SP BI_Provincia  FAIL!')
+	ELSE
+	PRINT('SP BI_Provincia OK!')
+END
+GO
 
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_ubicacion
 AS 
 BEGIN
-	INSERT INTO [REJUNTESA].BI_ubicacion(localidad_id, nombre, provincia_id)
-	SELECT DISTINCT
-		suc.id_localidad,
-        suc.direccion,
-		suc.id_provincia
-	FROM REJUNTESA.sucursal suc
+	INSERT INTO [REJUNTESA].BI_ubicacion(id_localidad, nombre, id_provincia)
+	SELECT
+		id_localidad,
+        nombre,
+		id_provincia
+	FROM REJUNTESA.localidad
 	IF @@ERROR != 0
 	PRINT('SP BI_ubicacion  FAIL!')
 	ELSE
@@ -254,14 +262,12 @@ BEGIN
 END
 GO
 
-
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_tipo_caja
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_tipo_caja(id_tipo_caja, nombre)
-    SELECT DISTINCT
+    SELECT
 		id_tipo_caja,
         nombre
     FROM [REJUNTESA].tipo_caja
@@ -271,145 +277,124 @@ BEGIN
     PRINT('SP TIPO CAJA BI OK!')
 END
 
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_sucursal
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_sucursal(id_sucursal, nombre, id_ubicacion)
-    SELECT DISTINCT
-		suc.id_sucursal,
-        suc.nombre
-    FROM [REJUNTESA].sucursal suc
-    JOIN [REJUNTESA].BI_ubicacion BIU on BIU.id_localidad = suc.id_localidad and BIU.id_sucursal = suc.id_sucursal 
+    SELECT
+		id_sucursal,
+        nombre,
+        id_localidad
+    FROM [REJUNTESA].sucursal
     IF @@ERROR != 0
     PRINT('SP BI sucursal FAIL!')
     ELSE
     PRINT('SP BI sucursal OK!')
 END
 
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_categoria
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_categoria(id_categoria, categoria)
-    SELECT DISTINCT
-		cat.id_categoria,
-        cat.categoria
-    FROM [REJUNTESA].categoria cat
+    SELECT
+		id_categoria,
+        categoria
+    FROM [REJUNTESA].categoria
     IF @@ERROR != 0
     PRINT('SP BI categoria FAIL!')
     ELSE
     PRINT('SP BI categoria OK!')
 END
 
-
-CREATE TABLE REJUNTESA.BI_subcategoria (
-    id_subcategoria INT,
-    subcategoria NVARCHAR(255),
-    id_categoria INT,
-    PRIMARY KEY (id_subcategoria),
-    CONSTRAINT [FK_id_categoria_en_BI_subcategoria.id_categoria]
-    FOREIGN KEY ([id_categoria])
-      REFERENCES [REJUNTESA].[BI_categoria]([id_categoria])
-);
-
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_subcategoria
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_subcategoria(id_subcategoria, subcategoria, id_categoria)
-    SELECT DISTINCT
-		sc.id_subcategoria,
-        sc.subcategoria,
-        sc.categoria
-    FROM [REJUNTESA].subcategoria sc
+    SELECT
+		id_subcategoria,
+        subcategoria,
+        id_categoria
+    FROM [REJUNTESA].subcategoria
     IF @@ERROR != 0
     PRINT('SP BI subcategoria FAIL!')
     ELSE
     PRINT('SP BI subcategoria OK!')
 END
 
-
--- Crea dimension Medio_Pago
-CREATE TABLE REJUNTESA.BI_medio_pago (
-    id_medio_pago INT,
-    nombre NVARCHAR(255),
-    PRIMARY KEY (id_medio_pago)
-);
-
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_medio_pago
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_medio_pago(id_medio_pago, nombre)
-    SELECT DISTINCT
-		mp.id_medio_pago,
-        mp.nombre,
-    FROM [REJUNTESA].medio_pago mp
+    SELECT
+		id_medio_pago,
+        nombre
+    FROM [REJUNTESA].medio_pago
     IF @@ERROR != 0
     PRINT('SP BI medio pago FAIL!')
     ELSE
     PRINT('SP BI medio pago OK!')
 END
 
-
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_producto
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_producto(id_producto, nombre)
-    SELECT DISTINCT
-		p.id_producto,
-        p.nombre
-    FROM [REJUNTESA].producto p
+    SELECT
+		id_producto,
+        nombre
+    FROM [REJUNTESA].producto
     IF @@ERROR != 0
     PRINT('SP BI Producto FAIL!')
     ELSE
     PRINT('SP BI Producto OK!')
 END
 
-
-
--- Crea tabla Venta
-CREATE TABLE REJUNTESA.BI_venta (
-    id_venta INT,
-    id_ubicacion INT,
-    id_tiempo INT,
-    total DECIMAL(18,2),
-    descuento_total DECIMAL(18,2),
-    id_turno INT,
-    cantidad_unidades decimal(18,0),
-    id_rango_empleado INT,
-    id_tipo_caja INT,
-    PRIMARY KEY (id_venta),
-    CONSTRAINT [FK_id_ubicacion_en_BI_venta.id_ubicacion]
-        FOREIGN KEY ([id_ubicacion])
-        REFERENCES [REJUNTESA].[BI_ubicacion]([id_ubicacion]),
-    CONSTRAINT [FK_id_tiempo_en_BI_venta.id_tiempo]
-        FOREIGN KEY ([id_tiempo])
-        REFERENCES [REJUNTESA].[BI_tiempo]([id_tiempo]),
-    CONSTRAINT [FK_id_turno_en_BI_venta.id_turno]
-        FOREIGN KEY ([id_turno])
-        REFERENCES [REJUNTESA].[BI_turno]([id_turno]),
-    CONSTRAINT [FK_id_rango_empleado_en_BI_venta.id_rango_empleado]
-        FOREIGN KEY ([id_rango_empleado])
-        REFERENCES [REJUNTESA].[BI_rango_etario]([id_rango_etario]),
-    CONSTRAINT [FK_id_tipo_caja_en_BI_venta.id_tipo_caja]
-        FOREIGN KEY ([id_tipo_caja])
-        REFERENCES [REJUNTESA].[BI_tipo_caja]([id_tipo_caja])
-);
-
-
 GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_tiempo
+AS
+
+DECLARE @primerAnio int = 1900
+SELECT @primerAnio = YEAR(MIN(fecha))
+FROM [REJUNTESA].venta
+
+DECLARE @cantidadMeses int = 12
+SELECT @cantidadMeses = DATEDIFF(month,MIN(f.fecha),MAX(f.fecha)) + 1
+FROM (
+    SELECT fecha FROM [REJUNTESA].venta
+    UNION
+    SELECT fecha_pago as fecha FROM [REJUNTESA].pago
+    UNION
+    SELECT fecha_programada as fecha FROM [REJUNTESA].envio
+    UNION
+    SELECT fecha_entrega as fecha FROM [REJUNTESA].envio
+) as f
+
+DECLARE @i int = 0
+WHILE @i < @cantidadMeses
+BEGIN
+    INSERT INTO [REJUNTESA].BI_tiempo(mes, cuatrimestre, anio) VALUES(
+        (@i%12) + 1,
+        ((@i/4)%3) + 1,
+        @i/12 + @primerAnio
+    )
+    SET @i = @i + 1
+    IF @@ERROR != 0
+    PRINT('SP BI Tiempo FAIL!')
+    ELSE
+    PRINT('SP BI Tiempo OK!')
+END
+
+/*GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_venta
 AS 
 BEGIN
     INSERT INTO [REJUNTESA].BI_venta(id_venta, id_ubicacion, total, descuento_total, id_turno, cantidad_unidades, id_rango_empleado, id_tipo_caja)
-    SELECT DISTINCT
+    SELECT
 		v.id_venta,
         u.id_ubicacion,
         v.total,
@@ -428,11 +413,4 @@ BEGIN
     PRINT('SP BI Producto FAIL!')
     ELSE
     PRINT('SP BI Producto OK!')
-END
-
-
-
-
-
-
-
+END*/
