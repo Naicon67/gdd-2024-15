@@ -524,3 +524,164 @@ BEGIN
 	JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
 
 END
+
+
+-- Vistas
+
+
+--1) Ticket  Promedio  mensual.  Valor  promedio  de  las  ventas  (en  $)  según  la 
+--localidad,  año  y  mes.  Se  calcula  en  función  de  la  sumatoria  del  importe  de  las 
+--ventas sobre el total de las mismas.
+
+CREATE VIEW BI_Ticket_Promedio_Mensual
+AS SELECT 
+
+u.id_localidad,
+t.anio,
+t.mes,
+(sum(v.total)/ count(v.id_venta)) 
+
+FROM BI_venta v
+join BI_tiempo t on t.id_tiempo = v.id_tiempo
+join BI_ubicacion u on v.id_ubicacion = u.id_provincia
+
+group by u.id_localidad, t.anio, t.mes
+
+
+--2) Cantidad  unidades  promedio.  Cantidad  promedio  de  artículos  que  se  venden 
+--en  función  de  los  tickets  según  el  turno  para  cada  cuatrimestre  de  cada  año.  Se 
+--obtiene  sumando  la  cantidad  de  artículos  de  todos  los  tickets  correspondientes 
+--sobre  la  cantidad  de  tickets.  Si  un  producto  tiene  más  de  una  unidad  en  un  ticket, 
+--para el indicador se consideran todas las unidades. 
+
+
+CREATE VIEW BI_Cantidad_Unidades_Promedio
+AS SELECT
+
+t.cuatrimestre as Cuatrimestre,
+t.anio  as Año,
+(v.cantidad_unidades)/
+(select count(distinct v2.id_venta) as [Cantidad unidades promedio]
+from BI_venta v2
+join BI_tiempo t2 on v2.id_venta = t2.id_tiempo
+where (t2.id_tiempo = t.id_tiempo))
+
+FROM BI_venta v
+join BI_producto_vendido pv on pv.id_venta = v.id_venta
+join BI_tiempo t on t.id_tiempo = v.id_tiempo
+
+GROUP BY  t.cuatrimestre, t.anio
+
+
+--3.  Porcentaje  anual  de  ventas  registradas  por  rango  etario  del  empleado  según  el 
+--tipo  de  caja  para  cada  cuatrimestre.  Se  calcula  tomando  la  cantidad  de  ventas 
+--correspondientes sobre el total de ventas anual. 
+
+
+CREATE VIEW BI_Porcentaje_Anual_Ventas
+AS SELECT
+t.cuatrimestre as Cuatrimestre,
+re.id_rango_etario as [Rango etario (E)], 
+tc.id_tipo_caja as [Tipo de caja],
+(
+count (distinct v.id_venta)
+)/
+(select count(distinct v2.id_venta) from Venta v2
+join BI_tiempo t2 on t2.id_tiempo = t.id_tiempo
+)
+
+from BI_venta v
+join BI_tiempo t on t.id_tiempo = v.id_tiempo
+join BI_rango_etario re on v.id_rango_empleado = re.id_rango_etario
+join BI_tipo_caja tc on tc.id_tipo_caja = v.id_tipo_caja
+
+group by t.cuatrimestre, re.id_rango_etario, tc.id_tipo_caja
+
+--4.  Cantidad  de  ventas  registradas  por  turno  para  cada  localidad  según  el  mes  de 
+--cada año. 
+
+CREATE VIEW BI_Cantidad_Ventas_Registradas
+AS SELECT
+t.anio as Año,
+t.mes as Mes,
+u.id_localidad as Localidad,
+count(distinct v.id_venta) as [Cantidad ventas]
+from BI_venta v
+join BI_tiempo t on t.id_tiempo = v.id_tiempo
+join BI_ubicacion u on u.id_localidad = v.id_ubicacion
+group by t.anio, t.mes, u.id_localidad
+
+--5.  Porcentaje  de  descuento  aplicados  en  función  del  total  de  los  tickets  según  el 
+--mes de cada año. 
+
+CREATE VIEW BI_Porcentaje_Descuento_Aplicado
+AS SELECT
+t.anio as Año, 
+t.mes as Mes,
+(v.descuento_total / v.total) * 100
+/
+(select count(distinct v2.id_venta) from BI_venta v2
+ join BI_tiempo t2 on v.id_tiempo = t2.id_tiempo
+ where t.id_tiempo = t2.id_tiempo) as [Descuento aplicado(%)]
+
+from BI_Venta v
+join BI_tiempo t on v.id_tiempo = t.id_tiempo
+group by t.anio, t.mes
+
+
+--6.  Las  tres  categorías  de  productos  con  mayor  descuento  aplicado  a  partir  de 
+--promociones para cada cuatrimestre de cada año. 
+
+
+CREATE VIEW BI_Categorias_con_mayor_Descuento
+AS SELECT
+top 3 
+
+c.categoria as Categoria
+
+from BI_categoria c
+join BI_producto_vendido pv on pv.id_categoria = c.id_categoria
+
+group by c.id_categoria
+
+order by sum(pv.descuento_promo) desc
+
+--7.  Porcentaje  de  cumplimiento  de  envíos  en  los  tiempos  programados  por 
+--sucursal por año/mes (desvío) 
+
+CREATE VIEW BI_Cumplimiento_Envios
+AS SELECT
+
+count(e.fecha_cumplida) / count(*) 
+
+from BI_envio e
+left join BI_tiempo t on e.id_tiempo = t.id_tiempo
+left join BI_sucursal s on s.id_sucursal = e.id_sucursal
+
+group by t.anio, t.cuatrimestre
+
+--8.  Cantidad  de  envíos  por  rango  etario  de  clientes  para  cada  cuatrimestre  de 
+--cada año. 
+
+CREATE VIEW BI_Envios_Rango_Etario
+AS SELECT
+
+t.anio, 
+t.cuatrimestre,
+e.id_rango_cliente,
+count(distinct e.id_envio)
+
+from BI_envio e
+join BI_tiempo t on e.id_tiempo = t.id_tiempo
+join BI_rango_etario re on re.id_rango_etario = e.id_rango_cliente
+
+group by t.anio, t.cuatrimestre, e.id_rango_cliente
+
+
+--9.  Las 5 localidades (tomando la localidad del cliente) con mayor costo de envío.
+
+CREATE VIEW BI_Localidades_Mayor_Costo
+AS SELECT
+select 
+top 5 
+
