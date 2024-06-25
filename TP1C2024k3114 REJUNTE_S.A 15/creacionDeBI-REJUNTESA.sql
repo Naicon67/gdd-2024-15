@@ -491,7 +491,7 @@ BEGIN
         pv.id_producto,
         pv.cantidad,
         pv.precio_total,
-        pa.descuento_total,
+        isnull(pa.descuento_total,0),
         p.precio,
         c.id_categoria,
         sc.id_categoria
@@ -500,7 +500,7 @@ BEGIN
 	join [REJUNTESA].producto p on pv.id_producto = p.id_producto  
 	join [REJUNTESA].subcategoria sc on sc.id_subcategoria = p.id_subcategoria
 	join [REJUNTESA].categoria c on c.id_categoria = sc.id_categoria
-    JOIN [REJUNTESA].promocion_aplicada pa ON pv.id_producto = pa.id_venta AND pv.id_producto = pa.id_producto
+    LEFT JOIN [REJUNTESA].promocion_aplicada pa ON pv.id_venta = pa.id_venta AND pv.id_producto = pa.id_producto
     IF @@ERROR != 0
     PRINT('SP BI Producto Vendido FAIL!')
     ELSE
@@ -543,17 +543,20 @@ BEGIN
 	SELECT 
         p.nro_pago,
         p.id_medio_pago,
-        isnull(dp.cuotas, 0),
+        isnull(dp.cuotas, 1),
         t.id_tiempo,
         p.importe,
         p.descuento_aplicado,
         v.id_sucursal, 
-        [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente),
+        CASE
+            WHEN dp.id_cliente IS NOT NULL THEN [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente)
+            ELSE NULL
+        END,
         v.id_venta
 	FROM [REJUNTESA].pago p
 	JOIN [REJUNTESA].medio_pago mp on mp.id_medio_pago = p.id_medio_pago
 	JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
-	JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
+	LEFT JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(p.fecha_pago) = t.mes AND YEAR(p.fecha_pago) = t.anio
     IF @@ERROR != 0
     PRINT('SP BI Pago FAIL!')
@@ -606,9 +609,7 @@ EXEC REJUNTESA.migrar_BI_envio
 GO
 EXEC REJUNTESA.migrar_BI_pago
 
-GO
-SELECT * FROM [REJUNTESA].BI_producto_vendido
-WHERE id_venta = 1
+SELECT * FROM [REJUNTESA].BI_pago
 
 /*
 -- Vistas

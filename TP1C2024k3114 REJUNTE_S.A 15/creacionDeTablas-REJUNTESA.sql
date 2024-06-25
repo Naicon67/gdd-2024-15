@@ -1,23 +1,23 @@
 USE [GD1C2024]
-GO
 
 -- Borra todas las FKs
+GO
 DECLARE @sql NVARCHAR(MAX) = N'';
 SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) +
     ' DROP CONSTRAINT ' + QUOTENAME(name) + ';'
 FROM sys.foreign_keys;
 EXEC sp_executesql @sql;
-GO
 
 -- Borra todas las tablas en el esquema REJUNTESA
+GO
 DECLARE @dropTableSQL NVARCHAR(MAX) = N'';
 SELECT @dropTableSQL += 'DROP TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(object_id)) + '.' + QUOTENAME(name) + '; '
 FROM sys.tables
 WHERE SCHEMA_NAME(schema_id) = 'REJUNTESA';
 EXEC sp_executesql @dropTableSQL;
-GO
 
 -- INICIO: DROP SPs
+GO
 IF EXISTS(	select
 		*
 	from sys.sysobjects
@@ -40,6 +40,7 @@ IF EXISTS(	select
 
 
 -- INICIO: DROP Functions
+GO
 IF EXISTS (
     SELECT *
     FROM sys.objects
@@ -60,6 +61,7 @@ END
 
 
 -- INICIO: DROP Views
+GO
 IF EXISTS (
     SELECT *
     FROM sys.objects
@@ -78,13 +80,8 @@ BEGIN
 END
 -- FIN: DROP Views
 
-
-
-
-
-
-
 -- INICIO: CREACION DE ESQUEMA
+GO
 IF EXISTS(
 SELECT * FROM sys.schemas where name = 'REJUNTESA'
 )
@@ -1020,10 +1017,10 @@ BEGIN
   INSERT INTO [REJUNTESA].producto_vendido(id_venta, id_producto, cantidad, precio_total)
   
   SELECT
-    v.id_venta                                          as id_venta,
-    p.id_producto                                       as id_producto,
-    SUM(TICKET_DET_CANTIDAD)                            as cantidad,
-    SUM(TICKET_DET_TOTAL - PROMO_APLICADA_DESCUENTO)    as precio_total
+    v.id_venta                                                  as id_venta,
+    p.id_producto                                               as id_producto,
+    SUM(TICKET_DET_CANTIDAD)                                    as cantidad,
+    SUM(TICKET_DET_TOTAL - isnull(PROMO_APLICADA_DESCUENTO,0))  as precio_total
   FROM gd_esquema.Maestra
   JOIN REJUNTESA.categoria c ON PRODUCTO_CATEGORIA = c.categoria
     JOIN REJUNTESA.subcategoria s ON
@@ -1161,17 +1158,5 @@ EXEC REJUNTESA.migrar_producto_vendido
 
 GO
 EXEC REJUNTESA.migrar_promocion_aplicada
-
-GO
-SELECT * FROM [REJUNTESA].producto_vendido
-WHERE id_venta = 1
-ORDER BY id_producto
-
-GO
-SELECT * FROM [REJUNTESA].promocion_aplicada
-WHERE id_venta = 1
-
-GO
-SELECT * FROM [REJUNTESA].producto
 
 -- FIN: EJECUCION DE PROCEDURES.
