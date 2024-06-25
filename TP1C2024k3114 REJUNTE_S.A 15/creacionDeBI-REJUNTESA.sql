@@ -358,11 +358,12 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_tiempo
 AS
 
-DECLARE @primerAnio int = 1900
-SELECT @primerAnio = YEAR(MIN(fecha))
+DECLARE @primerAnio int = 1900;
+DECLARE @primerMes int = 1;
+SELECT @primerAnio = YEAR(MIN(fecha)), @primerMes = MONTH(MIN(fecha))
 FROM [REJUNTESA].venta
 
-DECLARE @cantidadMeses int = 12
+DECLARE @cantidadMeses int = 12;
 SELECT @cantidadMeses = DATEDIFF(month,MIN(f.fecha),MAX(f.fecha)) + 1
 FROM (
     SELECT fecha FROM [REJUNTESA].venta
@@ -374,8 +375,8 @@ FROM (
     SELECT fecha_entrega as fecha FROM [REJUNTESA].envio
 ) as f
 
-DECLARE @i int = 0
-WHILE @i < @cantidadMeses
+DECLARE @i int = @primerMes - 1;
+WHILE @i < @cantidadMeses + @primerMes -1
 BEGIN
     INSERT INTO [REJUNTESA].BI_tiempo(mes, cuatrimestre, anio) VALUES(
         (@i%12) + 1,
@@ -389,281 +390,381 @@ BEGIN
     PRINT('SP BI Tiempo OK!')
 END
 
-/*GO
-CREATE PROCEDURE [REJUNTESA].migrar_BI_venta
-AS 
-BEGIN
-    INSERT INTO [REJUNTESA].BI_venta(id_venta, id_ubicacion, total, descuento_total, id_turno, cantidad_unidades, id_rango_empleado, id_tipo_caja)
-    SELECT
-		v.id_venta,
-        u.id_ubicacion,
-        v.total,
-        1, -- Aca iria tiempo, para mi es la fecha 
-        v.descuento_promociones, -- Esto se calcula asi?
-        -- id_turno
-        -- cantidad unidades,
-        -- id_rango_empleado
-        v.tipo_caja
-    FROM [REJUNTESA].venta v
-    JOIN [REJUNTESA].sucursal s on s.id_sucursal = v.sucursal
-    JOIN [REJUNTESA].ubicacion u on s.id_localidad = u.id_localidad and s.id_provincia = u.id_provincia
-    JOIN [REJUNTESA].caja c on c.nro_caja = v.nro_caja and c.sucursal = v.sucursal
-    JOIN [REJUNTESA].BI_turno BITU on v.fecha BETWEEN BITU.
-    IF @@ERROR != 0
-    PRINT('SP BI Producto FAIL!')
-    ELSE
-    PRINT('SP BI Producto OK!')
-END*/
-USE [GD1C2024]
 GO
-
-CREATE PROCEDURE [REJUNTESA].migrar_BI_producto_venidido
-AS
-BEGIN
-
-    INSERT INTO [REJUNTESA].BI_producto_vendido (id_venta, id_producto,cantidad,precio_total,descuento_promo,precio_unitario,id_categoria,id_subcategoria)
-  
-	SELECT 
-
-	pv.id_venta,
-	pv.id_producto,
-	pv.cantidad,
-	v.total, -- o sub_total?	
-	v.descuento_promociones,
-	p.precio,
-	c.id_categoria,
-	sc.id_categoria
-
-	from [REJUNTESA].producto_vendido pv
-	join [REJUNTESA].venta v on pv.id_venta = v.id_venta 
-	join [REJUNTESA].producto p on pv.id_producto = p.id_producto  
-	join [REJUNTESA].subcategoria sc on sc.id_subcategoria = p.id_subcategoria
-	join [REJUNTESA].categoria c on c.id_categoria = sc.id_categoria
-
-END
-
-
-CREATE FUNCTION calcular_edad(@fecha_nacimiento DATE)
+CREATE FUNCTION [REJUNTESA].calcular_edad(@fecha_nacimiento DATE)
 RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
     SET @edad = DATEDIFF(YEAR, @fecha_nacimiento, GETDATE());
     RETURN @edad;
-END;
+END
 
-CREATE FUNCTION obtener_rango_etario(@id_cliente int)
+GO
+CREATE FUNCTION [REJUNTESA].obtener_rango_etario(@edad int)
 RETURNS INT
 AS
 BEGIN
-	--DECLARE @re_id INT
-	DECLARE @edad INT
+    DECLARE @id INT;
+    SELECT @id = id_rango_etario
+    FROM [REJUNTESA].BI_rango_etario
+    WHERE @edad BETWEEN edad_min AND edad_max;
+    RETURN isnull(@id,1);
+END
 
-	--SELECT @re_id = re.id_rango_etario  from [REJUNTESA].BI_rango_etario re
-	--JOIN cliente c ON c.dni = @id_cliente
-	
-	 SELECT @edad = dbo.calcular_edad(c.nacimiento) from Cliente c
-	 WHERE c.dni = @id_cliente
+GO
+CREATE FUNCTION obtener_rango_etario_cliente(@id_cliente int)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @edad INT;
+    SELECT @edad = dbo.calcular_edad(nacimiento)
+    FROM [REJUNTESA].cliente
+    WHERE id_cliente = @id_cliente;
+    RETURN dbo.obtener_rango_etario(@edad);
+END
 
-	 RETURN 
-	 CASE
-        WHEN @edad < 25 THEN 0
-        WHEN @edad BETWEEN 25 AND 35 THEN 1
-        WHEN @edad BETWEEN 35 AND 50 THEN 2
-        WHEN @edad > 50 THEN 3 END
-	
+GO
+CREATE FUNCTION obtener_rango_etario_empleado(@legajo_empleado int)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @edad INT;
+    SELECT @edad = dbo.calcular_edad(nacimiento)
+    FROM [REJUNTESA].empleado
+    WHERE legajo_empleado = @legajo_empleado
+    RETURN dbo.obtener_rango_etario(@edad)
+END
+
+GO
+CREATE FUNCTION obtener_turno(@fecha date)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @id INT;
+    SELECT @id = id_turno
+    FROM [REJUNTESA].BI_turno
+    WHERE DATEPART(HOUR, @fecha) BETWEEN inicio_turno AND fin_turno
+    RETURN @id
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_venta
+AS 
+BEGIN
+    INSERT INTO [REJUNTESA].BI_venta(id_venta, id_ubicacion, total, descuento_total, id_turno, cantidad_unidades, id_rango_empleado, id_tipo_caja)
+    SELECT
+		v.id_venta,
+        s.id_localidad,
+        v.total,
+        MAX(v.descuento_promociones + v.descuento_medio),
+        MAX(dbo.obtener_turno(v.fecha)),
+        SUM(pv.cantidad),
+        MAX(dbo.obtener_rango_etario_empleado(v.legajo_empleado)),
+        c.id_tipo_caja
+    FROM [REJUNTESA].venta v
+    JOIN [REJUNTESA].sucursal s on s.id_sucursal = v.id_sucursal
+    JOIN [REJUNTESA].caja c on c.nro_caja = v.nro_caja and c.id_sucursal = v.id_sucursal
+    JOIN [REJUNTESA].producto_vendido pv ON v.id_venta = pv.id_venta
+    GROUP BY
+        v.id_venta,
+        s.id_localidad,
+        v.total,
+        c.id_tipo_caja
+    IF @@ERROR != 0
+    PRINT('SP BI Producto FAIL!')
+    ELSE
+    PRINT('SP BI Producto OK!')
+END
+
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_producto_vendido
+AS
+BEGIN
+    INSERT INTO [REJUNTESA].BI_producto_vendido (id_venta, id_producto,cantidad,precio_total,descuento_promo,precio_unitario,id_categoria,id_subcategoria)
+	SELECT 
+        pv.id_venta,
+        pv.id_producto,
+        pv.cantidad,
+        pv.precio_total,
+        pa.descuento_total,
+        p.precio,
+        c.id_categoria,
+        sc.id_categoria
+	from [REJUNTESA].producto_vendido pv
+	join [REJUNTESA].venta v on pv.id_venta = v.id_venta 
+	join [REJUNTESA].producto p on pv.id_producto = p.id_producto  
+	join [REJUNTESA].subcategoria sc on sc.id_subcategoria = p.id_subcategoria
+	join [REJUNTESA].categoria c on c.id_categoria = sc.id_categoria
+    JOIN [REJUNTESA].promocion_aplicada pa ON pv.id_producto = pa.id_venta AND pv.id_producto = pa.id_producto
+    IF @@ERROR != 0
+    PRINT('SP BI Producto Vendido FAIL!')
+    ELSE
+    PRINT('SP BI Producto Vendido OK!')
 END
 
 
-CREATE PROCEDURE [REJUNTESA].migrar_envio
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_envio
 AS
 BEGIN
-
- INSERT INTO [REJUNTESA].BI_envio (id_envio, fecha_cumplida, id_sucursal, id_tiempo, id_rango_cliente, id_ubicacion_destino, costo)
-  
-  SELECT 
-  e.id_envio, 
-  e.fecha_entrega,
-  v.id_sucursal,
-  1, -- ??
-  dbo.obtener_rango_etario(c.dni),
-  u.id_localidad,
-  e.costo
-
-  FROM [REJUNTESA].envio e
-  JOIN [REJUNTESA].venta v ON v.id_venta = e.id_venta
-  JOIN [REJUNTESA].cliente c ON e.id_cliente = c.dni
-  JOIN [REJUNTESA].sucursal s ON s.id_sucursal = v.id_sucursal
-  JOIN [REJUNTESA].ubicacion u ON s.id_localidad = u.id_localidad and s.id_provincia = u.id_provincia
-
+    INSERT INTO [REJUNTESA].BI_envio (id_envio, fecha_cumplida, id_sucursal, id_tiempo, id_rango_cliente, id_ubicacion_destino, costo)
+    SELECT 
+        e.id_envio,
+        CASE 
+           WHEN fecha_entrega <= fecha_programada THEN 1 
+           ELSE 0 
+        END,
+        v.id_sucursal,
+        t.id_tiempo,
+        dbo.obtener_rango_etario_cliente(c.id_cliente),
+        c.id_localidad,
+        e.costo
+    FROM [REJUNTESA].envio e
+    JOIN [REJUNTESA].venta v ON v.id_venta = e.id_venta
+    JOIN [REJUNTESA].cliente c ON e.id_cliente = c.dni
+    JOIN [REJUNTESA].sucursal s ON s.id_sucursal = v.id_sucursal
+    JOIN [REJUNTESA].BI_tiempo t ON MONTH(e.fecha_entrega) = t.mes AND YEAR(e.fecha_entrega) = t.anio
+    IF @@ERROR != 0
+    PRINT('SP BI Envio FAIL!')
+    ELSE
+    PRINT('SP BI Envio OK!')
 END
 
-
-
-	CREATE PROCEDURE [REJUNTESA].migrar_BI_pago
+GO
+CREATE PROCEDURE [REJUNTESA].migrar_BI_pago
 AS
 BEGIN
-
     INSERT INTO [REJUNTESA].BI_pago(nro_pago, id_medio_pago, cuotas, id_tiempo, importe, decuento_medio, id_sucursal, id_rango_cliente, id_venta)
 	SELECT 
-	p.nro_pago,
-	p.id_medio_pago,
-	isnull(dp.cuotas, 0),
-	1, -- ??
-	p.importe,
-	v.descuento_medio,
-	v.id_sucursal, 
-	dbo.obtener_rango_etario(dp.id_cliente),
-	v.id_venta
+        p.nro_pago,
+        p.id_medio_pago,
+        isnull(dp.cuotas, 0),
+        t.id_tiempo,
+        p.importe,
+        p.descuento_aplicado,
+        v.id_sucursal, 
+        dbo.obtener_rango_etario_cliente(dp.id_cliente),
+        v.id_venta
 	FROM [REJUNTESA].pago p
-
 	JOIN [REJUNTESA].medio_pago mp on mp.id_medio_pago = p.id_medio_pago
 	JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
-	JOIN [REJUNTESA].descuento_x_medio_pago dxmp on dxmp.id_medio_pago = mp.id_medio_pago
-	JOIN [REJUNTESA].descuento_medio_pago dmp on dxmp.cod_descuento = dmp.cod_descuento
 	JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
-
+    JOIN [REJUNTESA].BI_tiempo t ON MONTH(p.fecha_pago) = t.mes AND YEAR(p.fecha_pago) = t.anio
 END
 
+GO
+EXEC REJUNTESA.migrar_BI_rango_etario
+
+GO
+EXEC REJUNTESA.migrar_BI_rango_horario
+
+GO
+EXEC REJUNTESA.migrar_BI_provincia
+
+GO
+EXEC REJUNTESA.migrar_BI_ubicacion
+
+GO
+EXEC REJUNTESA.migrar_BI_tipo_caja
+
+GO
+EXEC REJUNTESA.migrar_BI_sucursal
+
+GO
+EXEC REJUNTESA.migrar_BI_categoria
+
+GO
+EXEC REJUNTESA.migrar_BI_subcategoria
+
+GO
+EXEC REJUNTESA.migrar_BI_producto
+
+GO
+EXEC REJUNTESA.migrar_BI_tiempo
+
+GO
+EXEC REJUNTESA.migrar_BI_medio_pago
+
+GO
+EXEC REJUNTESA.migrar_BI_venta
+
+GO
+EXEC REJUNTESA.migrar_BI_producto_vendido
+
+GO
+EXEC REJUNTESA.migrar_BI_envio
+
+GO
+EXEC REJUNTESA.migrar_BI_pago
+
+SELECT [REJUNTESA].obtener_rango_etario(([REJUNTESA].calcular_edad(nacimiento))) FROM [REJUNTESA].cliente
 
 -- Vistas
 
 
---1) Ticket  Promedio  mensual.  Valor  promedio  de  las  ventas  (en  $)  según  la 
---localidad,  año  y  mes.  Se  calcula  en  función  de  la  sumatoria  del  importe  de  las 
+--1) Ticket  Promedio  mensual.  Valor  promedio  de  las  ventas  (en  $)  segï¿½n  la 
+--localidad,  aï¿½o  y  mes.  Se  calcula  en  funciï¿½n  de  la  sumatoria  del  importe  de  las 
 --ventas sobre el total de las mismas.
+GO
+CREATE VIEW [REJUNTESA].BI_Ticket_Promedio_Mensual
+AS 
+SELECT 
+    u.id_localidad,
+    t.anio,
+    t.mes,
+    (SUM(v.total) / COUNT(v.id_venta)) AS [Promedio de ventas $]
+FROM 
+    [REJUNTESA].BI_venta v
+JOIN 
+    [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
+JOIN 
+    [REJUNTESA].BI_ubicacion u ON v.id_ubicacion = u.id_provincia
+GROUP BY 
+    u.id_localidad, t.anio, t.mes;
+END
 
-CREATE VIEW BI_Ticket_Promedio_Mensual
-AS SELECT 
-
-u.id_localidad,
-t.anio,
-t.mes,
-(sum(v.total)/ count(v.id_venta)) 
-
-FROM BI_venta v
-join BI_tiempo t on t.id_tiempo = v.id_tiempo
-join BI_ubicacion u on v.id_ubicacion = u.id_provincia
-
-group by u.id_localidad, t.anio, t.mes
+select * from [REJUNTESA].BI_Ticket_Promedio_Mensual
 
 
---2) Cantidad  unidades  promedio.  Cantidad  promedio  de  artículos  que  se  venden 
---en  función  de  los  tickets  según  el  turno  para  cada  cuatrimestre  de  cada  año.  Se 
---obtiene  sumando  la  cantidad  de  artículos  de  todos  los  tickets  correspondientes 
---sobre  la  cantidad  de  tickets.  Si  un  producto  tiene  más  de  una  unidad  en  un  ticket, 
+--2) Cantidad  unidades  promedio.  Cantidad  promedio  de  artï¿½culos  que  se  venden 
+--en  funciï¿½n  de  los  tickets  segï¿½n  el  turno  para  cada  cuatrimestre  de  cada  aï¿½o.  Se 
+--obtiene  sumando  la  cantidad  de  artï¿½culos  de  todos  los  tickets  correspondientes 
+--sobre  la  cantidad  de  tickets.  Si  un  producto  tiene  mï¿½s  de  una  unidad  en  un  ticket, 
 --para el indicador se consideran todas las unidades. 
 
+GO
+CREATE VIEW [REJUNTESA].BI_Cantidad_Unidades_Promedio
+AS 
+SELECT
+    t.cuatrimestre AS 'Cuatrimestre',
+    t.anio AS 'AÃ±o',
+    (v.cantidad_unidades) /
+    (SELECT COUNT(DISTINCT v2.id_venta)
+     FROM BI_venta v2
+     JOIN BI_tiempo t2 ON v2.id_tiempo = t2.id_tiempo
+     WHERE t2.cuatrimestre = t.cuatrimestre AND t2.anio = t.anio) AS [Cantidad unidades promedio]
+FROM 
+    [REJUNTESA].BI_venta v
+JOIN 
+    [REJUNTESA].BI_producto_vendido pv ON pv.id_venta = v.id_venta
+JOIN 
+    [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo;
+END
 
-CREATE VIEW BI_Cantidad_Unidades_Promedio
-AS SELECT
+select * from [REJUNTESA].BI_Cantidad_Unidades_Promedio
 
-t.cuatrimestre as Cuatrimestre,
-t.anio  as Año,
-(v.cantidad_unidades)/
-(select count(distinct v2.id_venta) as [Cantidad unidades promedio]
-from BI_venta v2
-join BI_tiempo t2 on v2.id_venta = t2.id_tiempo
-where (t2.id_tiempo = t.id_tiempo))
-
-FROM BI_venta v
-join BI_producto_vendido pv on pv.id_venta = v.id_venta
-join BI_tiempo t on t.id_tiempo = v.id_tiempo
-
-GROUP BY  t.cuatrimestre, t.anio
-
-
---3.  Porcentaje  anual  de  ventas  registradas  por  rango  etario  del  empleado  según  el 
+--3.  Porcentaje  anual  de  ventas  registradas  por  rango  etario  del  empleado  segï¿½n  el 
 --tipo  de  caja  para  cada  cuatrimestre.  Se  calcula  tomando  la  cantidad  de  ventas 
 --correspondientes sobre el total de ventas anual. 
 
+GO
+CREATE VIEW [REJUNTESA].BI_Porcentaje_Anual_Ventas
+AS 
+SELECT
+    t.cuatrimestre AS Cuatrimestre,
+    re.id_rango_etario AS [Rango etario (E)], 
+    tc.id_tipo_caja AS [Tipo de caja],
+    (
+        COUNT(DISTINCT v.id_venta) * 1.0 /
+        (SELECT COUNT(DISTINCT v2.id_venta) 
+         FROM BI_venta v2
+         JOIN BI_tiempo t2 ON v2.id_tiempo = t2.id_tiempo
+         WHERE t2.anio = t.anio)
+    ) AS [Porcentaje de ventas]
+FROM 
+    [REJUNTESA].BI_venta v
+JOIN 
+    [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
+JOIN 
+    [REJUNTESA].BI_rango_etario re ON v.id_rango_empleado = re.id_rango_etario
+JOIN 
+    [REJUNTESA].BI_tipo_caja tc ON tc.id_tipo_caja = v.id_tipo_caja
+GROUP BY 
+    t.cuatrimestre, re.id_rango_etario, tc.id_tipo_caja, t.anio;
+END 
 
-CREATE VIEW BI_Porcentaje_Anual_Ventas
+select * from [REJUNTESA].BI_Porcentaje_Anual_Ventas
+
+
+--4.  Cantidad  de  ventas  registradas  por  turno  para  cada  localidad  segï¿½n  el  mes  de 
+--cada aï¿½o. 
+GO
+CREATE VIEW [REJUNTESA].BI_Cantidad_Ventas_Registradas
+AS 
+SELECT
+    t.anio as AÃ±o,
+    t.mes as Mes,
+    u.id_localidad AS Localidad,
+    COUNT(DISTINCT v.id_venta) AS [Cantidad ventas]
+FROM 
+    [REJUNTESA].BI_venta v
+JOIN 
+    [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
+JOIN 
+    [REJUNTESA].BI_ubicacion u ON u.id_localidad = v.id_ubicacion
+GROUP BY 
+    [REJUNTESA].t.anio, t.mes, u.id_localidad;
+END
+
+select * from [REJUNTESA].BI_Cantidad_Ventas_Registradas
+
+
+--5.  Porcentaje  de  descuento  aplicados  en  funciï¿½n  del  total  de  los  tickets  segï¿½n  el 
+--mes de cada aï¿½o. 
+
+GO
+CREATE VIEW [REJUNTESA].BI_Porcentaje_Descuento_Aplicado
 AS SELECT
-t.cuatrimestre as Cuatrimestre,
-re.id_rango_etario as [Rango etario (E)], 
-tc.id_tipo_caja as [Tipo de caja],
-(
-count (distinct v.id_venta)
-)/
-(select count(distinct v2.id_venta) from Venta v2
-join BI_tiempo t2 on t2.id_tiempo = t.id_tiempo
-)
-
-from BI_venta v
-join BI_tiempo t on t.id_tiempo = v.id_tiempo
-join BI_rango_etario re on v.id_rango_empleado = re.id_rango_etario
-join BI_tipo_caja tc on tc.id_tipo_caja = v.id_tipo_caja
-
-group by t.cuatrimestre, re.id_rango_etario, tc.id_tipo_caja
-
---4.  Cantidad  de  ventas  registradas  por  turno  para  cada  localidad  según  el  mes  de 
---cada año. 
-
-CREATE VIEW BI_Cantidad_Ventas_Registradas
-AS SELECT
-t.anio as Año,
-t.mes as Mes,
-u.id_localidad as Localidad,
-count(distinct v.id_venta) as [Cantidad ventas]
-from BI_venta v
-join BI_tiempo t on t.id_tiempo = v.id_tiempo
-join BI_ubicacion u on u.id_localidad = v.id_ubicacion
-group by t.anio, t.mes, u.id_localidad
-
---5.  Porcentaje  de  descuento  aplicados  en  función  del  total  de  los  tickets  según  el 
---mes de cada año. 
-
-CREATE VIEW BI_Porcentaje_Descuento_Aplicado
-AS SELECT
-t.anio as Año, 
+t.anio as Ano, 
 t.mes as Mes,
 (v.descuento_total / v.total) * 100
 /
-(select count(distinct v2.id_venta) from BI_venta v2
- join BI_tiempo t2 on v.id_tiempo = t2.id_tiempo
+(select count(distinct v2.id_venta) from [REJUNTESA].BI_venta v2
+ join [REJUNTESA].BI_tiempo t2 on v.id_tiempo = t2.id_tiempo
  where t.id_tiempo = t2.id_tiempo) as [Descuento aplicado(%)]
 
-from BI_Venta v
-join BI_tiempo t on v.id_tiempo = t.id_tiempo
+from [REJUNTESA].BI_Venta v
+join [REJUNTESA].BI_tiempo t on v.id_tiempo = t.id_tiempo
 group by t.anio, t.mes
+END
 
 
---6.  Las  tres  categorías  de  productos  con  mayor  descuento  aplicado  a  partir  de 
---promociones para cada cuatrimestre de cada año. 
+--6.  Las  tres  categorï¿½as  de  productos  con  mayor  descuento  aplicado  a  partir  de 
+--promociones para cada cuatrimestre de cada aï¿½o. 
 
 
-CREATE VIEW BI_Categorias_con_mayor_Descuento
+CREATE VIEW [REJUNTESA].BI_Categorias_con_mayor_Descuento
 AS SELECT
 top 3 
 
 c.categoria as Categoria
 
-from BI_categoria c
-join BI_producto_vendido pv on pv.id_categoria = c.id_categoria
+from [REJUNTESA].BI_categoria c
+join [REJUNTESA].BI_producto_vendido pv on pv.id_categoria = c.id_categoria
 
 group by c.id_categoria
 
 order by sum(pv.descuento_promo) desc
 
---7.  Porcentaje  de  cumplimiento  de  envíos  en  los  tiempos  programados  por 
---sucursal por año/mes (desvío) 
+--7.  Porcentaje  de  cumplimiento  de  envï¿½os  en  los  tiempos  programados  por 
+--sucursal por aï¿½o/mes (desvï¿½o) 
 
-CREATE VIEW BI_Cumplimiento_Envios
+CREATE VIEW [REJUNTESA].BI_Cumplimiento_Envios
 AS SELECT
 
 count(e.fecha_cumplida) / count(*) 
 
-from BI_envio e
-left join BI_tiempo t on e.id_tiempo = t.id_tiempo
-left join BI_sucursal s on s.id_sucursal = e.id_sucursal
+from [REJUNTESA].BI_envio e
+left join [REJUNTESA].BI_tiempo t on e.id_tiempo = t.id_tiempo
+left join [REJUNTESA].BI_sucursal s on s.id_sucursal = e.id_sucursal
 
 group by t.anio, t.cuatrimestre
 
---8.  Cantidad  de  envíos  por  rango  etario  de  clientes  para  cada  cuatrimestre  de 
---cada año. 
+--8.  Cantidad  de  envï¿½os  por  rango  etario  de  clientes  para  cada  cuatrimestre  de 
+--cada aï¿½o. 
 
-CREATE VIEW BI_Envios_Rango_Etario
+CREATE VIEW [REJUNTESA].BI_Envios_Rango_Etario
 AS SELECT
 
 t.anio, 
@@ -671,17 +772,18 @@ t.cuatrimestre,
 e.id_rango_cliente,
 count(distinct e.id_envio)
 
-from BI_envio e
-join BI_tiempo t on e.id_tiempo = t.id_tiempo
-join BI_rango_etario re on re.id_rango_etario = e.id_rango_cliente
+from [REJUNTESA].BI_envio e
+join [REJUNTESA].BI_tiempo t on e.id_tiempo = t.id_tiempo
+join [REJUNTESA].BI_rango_etario re on re.id_rango_etario = e.id_rango_cliente
 
 group by t.anio, t.cuatrimestre, e.id_rango_cliente
 
 
---9.  Las 5 localidades (tomando la localidad del cliente) con mayor costo de envío.
+--9.  Las 5 localidades (tomando la localidad del cliente) con mayor costo de envï¿½o.
 
 CREATE VIEW BI_Localidades_Mayor_Costo
 AS SELECT
 select 
 top 5 
 
+*/

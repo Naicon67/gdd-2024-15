@@ -38,6 +38,52 @@ IF EXISTS(	select
 	END
 -- FIN: DROP SPs
 
+
+-- INICIO: DROP Functions
+IF EXISTS (
+    SELECT *
+    FROM sys.objects
+    WHERE type IN ('FN', 'IF', 'TF') 
+)
+BEGIN
+    PRINT 'Existen funciones de una ejecución pasada'
+    PRINT 'Se procede a borrarlas...'
+    DECLARE @sql NVARCHAR(MAX) = N'';
+    SELECT @sql += N'
+    DROP FUNCTION ' + QUOTENAME(SCHEMA_NAME(schema_id)) + '.' + QUOTENAME(name) + ';'
+    FROM sys.objects
+    WHERE type IN ('FN', 'IF', 'TF')
+    --PRINT @sql;
+    EXEC sp_executesql @sql;
+END
+-- FIN: DROP Functions
+
+
+-- INICIO: DROP Views
+IF EXISTS (
+    SELECT *
+    FROM sys.objects
+    WHERE type = 'V' 
+)
+BEGIN
+    PRINT 'Existen vistas de una ejecución pasada'
+    PRINT 'Se procede a borrarlas...'
+    DECLARE @sql NVARCHAR(MAX) = N'';
+    SELECT @sql += N'
+    DROP VIEW ' + QUOTENAME(SCHEMA_NAME(schema_id)) + '.' + QUOTENAME(name) + ';'
+    FROM sys.objects
+    WHERE type = 'V';
+    --PRINT @sql;
+    EXEC sp_executesql @sql;
+END
+-- FIN: DROP Views
+
+
+
+
+
+
+
 -- INICIO: CREACION DE ESQUEMA
 IF EXISTS(
 SELECT * FROM sys.schemas where name = 'REJUNTESA'
