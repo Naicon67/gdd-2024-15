@@ -216,7 +216,7 @@ BEGIN
 END
 
 GO
-CREATE PROCEDURE [REJUNTESA].migrar_BI_rango_horario
+CREATE PROCEDURE [REJUNTESA].migrar_BI_turno
 AS 
 BEGIN
 	INSERT INTO [REJUNTESA].BI_turno(inicio_turno, fin_turno) VALUES(8,12)
@@ -418,7 +418,7 @@ RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
-    SELECT @edad = dbo.calcular_edad(nacimiento)
+    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento)
     FROM [REJUNTESA].cliente
     WHERE id_cliente = @id_cliente;
     RETURN [REJUNTESA].obtener_rango_etario(@edad);
@@ -430,51 +430,55 @@ RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
-    SELECT @edad = dbo.calcular_edad(nacimiento)
+    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento)
     FROM [REJUNTESA].empleado
     WHERE legajo_empleado = @legajo_empleado
     RETURN [REJUNTESA].obtener_rango_etario(@edad)
 END
 
 GO
-CREATE FUNCTION obtener_turno(@fecha date)
+CREATE FUNCTION [REJUNTESA].obtener_turno(@fecha datetime)
 RETURNS INT
 AS
 BEGIN
+    DECLARE @hora INT = DATEPART(HOUR, @fecha)
     DECLARE @id INT;
     SELECT @id = id_turno
     FROM [REJUNTESA].BI_turno
-    WHERE DATEPART(HOUR, @fecha) BETWEEN inicio_turno AND fin_turno
-    RETURN @id
+    WHERE @hora BETWEEN inicio_turno AND fin_turno
+    RETURN isnull(@id, 1)
 END
 
 GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_venta
 AS 
 BEGIN
-    INSERT INTO [REJUNTESA].BI_venta(id_venta, id_ubicacion, total, descuento_total, id_turno, cantidad_unidades, id_rango_empleado, id_tipo_caja)
+    INSERT INTO [REJUNTESA].BI_venta(id_venta, id_ubicacion, id_tiempo, total, descuento_total, id_turno, cantidad_unidades, id_rango_empleado, id_tipo_caja)
     SELECT
 		v.id_venta,
         s.id_localidad,
+        t.id_tiempo,
         v.total,
-        MAX(v.descuento_promociones + v.descuento_medio),
-        MAX(dbo.obtener_turno(v.fecha)),
-        SUM(pv.cantidad),
-        MAX([REJUNTESA].obtener_rango_etario_empleado(v.legajo_empleado)),
+        MAX(v.descuento_promociones + v.descuento_medio) as descuento_total,
+        MAX([REJUNTESA].obtener_turno(v.fecha)) as id_turno,
+        SUM(pv.cantidad) as cantidad_unidades,
+        MAX([REJUNTESA].obtener_rango_etario_empleado(v.legajo_empleado)) as id_rango_empleado,
         c.id_tipo_caja
     FROM [REJUNTESA].venta v
     JOIN [REJUNTESA].sucursal s on s.id_sucursal = v.id_sucursal
     JOIN [REJUNTESA].caja c on c.nro_caja = v.nro_caja and c.id_sucursal = v.id_sucursal
     JOIN [REJUNTESA].producto_vendido pv ON v.id_venta = pv.id_venta
+    JOIN [REJUNTESA].BI_tiempo t ON MONTH(v.fecha) = t.mes AND YEAR(v.fecha) = t.anio
     GROUP BY
         v.id_venta,
         s.id_localidad,
+        t.id_tiempo,
         v.total,
         c.id_tipo_caja
     IF @@ERROR != 0
-    PRINT('SP BI Producto FAIL!')
+    PRINT('SP BI Venta FAIL!')
     ELSE
-    PRINT('SP BI Producto OK!')
+    PRINT('SP BI Venta OK!')
 END
 
 GO
@@ -551,13 +555,17 @@ BEGIN
 	JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
 	JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(p.fecha_pago) = t.mes AND YEAR(p.fecha_pago) = t.anio
+    IF @@ERROR != 0
+    PRINT('SP BI Pago FAIL!')
+    ELSE
+    PRINT('SP BI Pago OK!')
 END
 
 GO
 EXEC REJUNTESA.migrar_BI_rango_etario
 
 GO
-EXEC REJUNTESA.migrar_BI_rango_horario
+EXEC REJUNTESA.migrar_BI_turno
 
 GO
 EXEC REJUNTESA.migrar_BI_provincia
@@ -598,8 +606,10 @@ EXEC REJUNTESA.migrar_BI_envio
 GO
 EXEC REJUNTESA.migrar_BI_pago
 
+GO
+SELECT * FROM [REJUNTESA].BI_venta
 
-
+/*
 -- Vistas
 
 
