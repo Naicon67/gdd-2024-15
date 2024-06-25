@@ -607,9 +607,9 @@ GO
 EXEC REJUNTESA.migrar_BI_pago
 
 GO
-SELECT * FROM [REJUNTESA].BI_venta
+SELECT * FROM [REJUNTESA].BI_tiempo
 
-/*
+
 -- Vistas
 
 
@@ -617,7 +617,8 @@ SELECT * FROM [REJUNTESA].BI_venta
 --localidad,  a�o  y  mes.  Se  calcula  en  funci�n  de  la  sumatoria  del  importe  de  las 
 --ventas sobre el total de las mismas.
 GO
-CREATE VIEW [REJUNTESA].BI_Ticket_Promedio_Mensual
+CREATE
+VIEW [REJUNTESA].BI_Ticket_Promedio_Mensual
 AS 
 SELECT 
     u.id_localidad,
@@ -629,10 +630,9 @@ FROM
 JOIN 
     [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
 JOIN 
-    [REJUNTESA].BI_ubicacion u ON v.id_ubicacion = u.id_provincia
+    [REJUNTESA].BI_ubicacion u ON v.id_ubicacion = u.id_localidad
 GROUP BY 
     u.id_localidad, t.anio, t.mes;
-END
 
 select * from [REJUNTESA].BI_Ticket_Promedio_Mensual
 
@@ -643,26 +643,30 @@ select * from [REJUNTESA].BI_Ticket_Promedio_Mensual
 --sobre  la  cantidad  de  tickets.  Si  un  producto  tiene  m�s  de  una  unidad  en  un  ticket, 
 --para el indicador se consideran todas las unidades. 
 
+-- Problema group by 
+
+/*
 GO
 CREATE VIEW [REJUNTESA].BI_Cantidad_Unidades_Promedio
 AS 
 SELECT
-    t.cuatrimestre AS 'Cuatrimestre',
-    t.anio AS 'Año',
-    (v.cantidad_unidades) /
+	ti.anio AS 'Año',
+    ti.cuatrimestre AS 'Cuatrimestre',
+    v.id_turno AS 'Turno',
+    v.cantidad_unidades /
     (SELECT COUNT(DISTINCT v2.id_venta)
      FROM [REJUNTESA].BI_venta v2
      JOIN [REJUNTESA].BI_tiempo t2 ON v2.id_tiempo = t2.id_tiempo
-     WHERE t2.cuatrimestre = t.cuatrimestre AND t2.anio = t.anio) AS [Cantidad unidades promedio]
+     WHERE t2.cuatrimestre = ti.cuatrimestre AND t2.anio = ti.anio) AS [Cantidad unidades promedio]
 FROM 
     [REJUNTESA].BI_venta v
 JOIN 
     [REJUNTESA].BI_producto_vendido pv ON pv.id_venta = v.id_venta
 JOIN 
-    [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo;
-END
+    [REJUNTESA].BI_tiempo ti ON ti.id_tiempo = v.id_tiempo
+GROUP BY ti.anio, ti.cuatrimestre, v.id_turno;
 
-select * from [REJUNTESA].BI_Cantidad_Unidades_Promedio
+select * from [REJUNTESA].BI_Cantidad_Unidades_Promedio */
 
 --3.  Porcentaje  anual  de  ventas  registradas  por  rango  etario  del  empleado  seg�n  el 
 --tipo  de  caja  para  cada  cuatrimestre.  Se  calcula  tomando  la  cantidad  de  ventas 
@@ -692,7 +696,6 @@ JOIN
     [REJUNTESA].BI_tipo_caja tc ON tc.id_tipo_caja = v.id_tipo_caja
 GROUP BY 
     t.cuatrimestre, re.id_rango_etario, tc.id_tipo_caja, t.anio;
-END 
 
 select * from [REJUNTESA].BI_Porcentaje_Anual_Ventas
 
@@ -715,7 +718,6 @@ JOIN
     [REJUNTESA].BI_ubicacion u ON u.id_localidad = v.id_ubicacion
 GROUP BY 
     t.anio, t.mes, u.id_localidad;
-END
 
 select * from [REJUNTESA].BI_Cantidad_Ventas_Registradas
 
@@ -723,6 +725,9 @@ select * from [REJUNTESA].BI_Cantidad_Ventas_Registradas
 --5.  Porcentaje  de  descuento  aplicados  en  funci�n  del  total  de  los  tickets  seg�n  el 
 --mes de cada a�o. 
 
+-- Problema group by 
+
+/*
 GO
 CREATE VIEW [REJUNTESA].BI_Porcentaje_Descuento_Aplicado
 AS SELECT
@@ -737,8 +742,7 @@ t.mes as Mes,
 from [REJUNTESA].BI_Venta v
 join [REJUNTESA].BI_tiempo t on v.id_tiempo = t.id_tiempo
 group by t.anio, t.mes
-END
-
+*/
 
 --6.  Las  tres  categor�as  de  productos  con  mayor  descuento  aplicado  a  partir  de 
 --promociones para cada cuatrimestre de cada a�o. 
@@ -746,19 +750,22 @@ END
 
 CREATE VIEW [REJUNTESA].BI_Categorias_con_mayor_Descuento
 AS SELECT
-top 3 
+top 3  
 
-c.categoria as Categoria
+c.categoria AS 'Categoria'
 
-from [REJUNTESA].BI_categoria c
-join [REJUNTESA].BI_producto_vendido pv on pv.id_categoria = c.id_categoria
+FROM [REJUNTESA].BI_categoria c
+JOIN [REJUNTESA].BI_producto_vendido pv ON pv.id_categoria = c.id_categoria
 
-group by c.id_categoria
+GROUP BY  c.categoria 
 
-order by sum(pv.descuento_promo) desc
+ORDER BY  SUM(pv.descuento_promo) DESC
+
 
 --7.  Porcentaje  de  cumplimiento  de  env�os  en  los  tiempos  programados  por 
 --sucursal por a�o/mes (desv�o) 
+
+-- No se estan cargando los envios en las migraciones, no se puede probar
 
 CREATE VIEW [REJUNTESA].BI_Cumplimiento_Envios
 AS SELECT
@@ -773,6 +780,8 @@ group by t.anio, t.cuatrimestre
 
 --8.  Cantidad  de  env�os  por  rango  etario  de  clientes  para  cada  cuatrimestre  de 
 --cada a�o. 
+
+-- No se estan cargando los envios en las migraciones, no se puede probar
 
 CREATE VIEW [REJUNTESA].BI_Envios_Rango_Etario
 AS SELECT
