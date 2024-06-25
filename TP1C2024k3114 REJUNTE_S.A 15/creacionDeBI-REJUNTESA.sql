@@ -607,9 +607,10 @@ GO
 EXEC REJUNTESA.migrar_BI_pago
 
 GO
-SELECT * FROM [REJUNTESA].BI_tiempo
+SELECT * FROM [REJUNTESA].BI_producto_vendido
+WHERE id_venta = 1
 
-
+/*
 -- Vistas
 
 

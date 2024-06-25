@@ -1020,10 +1020,10 @@ BEGIN
   INSERT INTO [REJUNTESA].producto_vendido(id_venta, id_producto, cantidad, precio_total)
   
   SELECT
-    v.id_venta               as id_venta,
-    p.id_producto            as id_producto,
-    SUM(TICKET_DET_CANTIDAD) as cantidad,
-    SUM(TICKET_DET_TOTAL)    as precio_total
+    v.id_venta                                          as id_venta,
+    p.id_producto                                       as id_producto,
+    SUM(TICKET_DET_CANTIDAD)                            as cantidad,
+    SUM(TICKET_DET_TOTAL - PROMO_APLICADA_DESCUENTO)    as precio_total
   FROM gd_esquema.Maestra
   JOIN REJUNTESA.categoria c ON PRODUCTO_CATEGORIA = c.categoria
     JOIN REJUNTESA.subcategoria s ON
@@ -1161,5 +1161,17 @@ EXEC REJUNTESA.migrar_producto_vendido
 
 GO
 EXEC REJUNTESA.migrar_promocion_aplicada
+
+GO
+SELECT * FROM [REJUNTESA].producto_vendido
+WHERE id_venta = 1
+ORDER BY id_producto
+
+GO
+SELECT * FROM [REJUNTESA].promocion_aplicada
+WHERE id_venta = 1
+
+GO
+SELECT * FROM [REJUNTESA].producto
 
 -- FIN: EJECUCION DE PROCEDURES.

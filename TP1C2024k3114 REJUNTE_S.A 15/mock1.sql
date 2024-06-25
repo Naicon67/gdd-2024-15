@@ -1,31 +1,7 @@
 USE [GD1C2024]
 
-SELECT
-    sub_total,
-    descuento_promociones,
-    descuento_medio,
-    total,
-    total_costo_envios,
-    nro_ticket
-FROM REJUNTESA.venta
-WHERE id_venta = 1
-
-SELECT
-    *
-FROM REJUNTESA.pago
-WHERE id_venta = 1
-
-SELECT
-    SUM(precio_total)
-FROM REJUNTESA.producto_vendido
-WHERE id_venta = 1
-
-SELECT
-    *
-FROM REJUNTESA.producto_vendido
-WHERE id_venta = 1
-
-SELECT
-    *
-FROM REJUNTESA.promocion_aplicada
-WHERE id_venta = 1
+SELECT DISTINCT
+    PRODUCTO_PRECIO, PROMO_APLICADA_DESCUENTO, TICKET_DET_CANTIDAD, TICKET_DET_TOTAL, TICKET_NUMERO
+FROM [gd_esquema].Maestra
+WHERE PRODUCTO_NOMBRE = 'Codigo:0131231312' AND PRODUCTO_MARCA = 'Marca N°013414124'
+ORDER BY TICKET_DET_CANTIDAD
