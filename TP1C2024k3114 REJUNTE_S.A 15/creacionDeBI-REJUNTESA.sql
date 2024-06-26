@@ -789,10 +789,10 @@ SELECT
 t.anio AS 'Año',
 t.cuatrimestre AS 'Cuatrimestre',
 s.id_sucursal AS 'Sucursal',
-CAST ( (ROUND(CAST ( (select count(*) 
-from [REJUNTESA].BI_envio e2
-JOIN [REJUNTESA].BI_tiempo t2 on e2.id_tiempo = t2.id_tiempo
-where e2.fecha_cumplida = 1 and t2.anio = t.anio and t2.cuatrimestre = t.cuatrimestre and e2.id_sucursal = s.id_sucursal)  AS DECIMAL(12,2)) 
+CAST ( (ROUND(CAST ( (SELECT COUNT(*) 
+FROM [REJUNTESA].BI_envio e2
+JOIN [REJUNTESA].BI_tiempo t2 ON e2.id_tiempo = t2.id_tiempo
+WHERE e2.fecha_cumplida = 1 and t2.anio = t.anio and t2.cuatrimestre = t.cuatrimestre and e2.id_sucursal = s.id_sucursal)  AS DECIMAL(12,2)) 
 /
 CAST (count(*) AS DECIMAL(12,2)) * 100, 2)) AS DECIMAL(12,2)) AS 'Cumplimiento de Envios (%)'
 
@@ -829,15 +829,59 @@ SELECT * FROM [REJUNTESA].BI_Envios_Rango_Etario
 ORDER BY 1,2,3
 
 
-/*
-
 --9.  Las 5 localidades (tomando la localidad del cliente) con mayor costo de env�o.
 
+CREATE VIEW [REJUNTESA].BI_Localidades_Mayor_Costo_Envio
+AS
+-- ¿Hay que mostrar tambien el costo? 
+-- (Son el top 5, pero no queda ordenado)
+SELECT
+ u.id_localidad
+ --,
+ -- SUM(e.costo)
+FROM [REJUNTESA].BI_ubicacion u
+--JOIN [REJUNTESA].BI_envio e
+ --ON e.id_ubicacion_destino = u.id_localidad
+WHERE u.id_localidad IN 
+(
+SELECT top 5 u2.id_localidad FROM [REJUNTESA].BI_envio e2
+JOIN [REJUNTESA].BI_ubicacion u2 ON e2.id_ubicacion_destino = u2.id_localidad
+GROUP BY u2.id_localidad
+ORDER BY SUM(e2.costo) DESC
+)
+GROUP BY u.id_localidad 
 
+SELECT * FROM [REJUNTESA].BI_Localidades_Mayor_Costo_Envio
 
-CREATE VIEW BI_Localidades_Mayor_Costo
-AS SELECT
-select 
-top 5 
-
+--Las 3 sucursales con el mayor importe de pagos en cuotas, según el medio de
+--pago, mes y año. Se calcula sumando los importes totales de todas las ventas en
+--cuotas
 /*
+
+CREATE VIEW [REJUNTESA].BI_Sucursales_Mayor_Importe_Cuotas
+AS
+SELECT
+p.id_medio_pago,
+t.anio,
+t.mes,
+p.id_sucursal
+FROM [REJUNTESA].BI_pago p
+JOIN [REJUNTESA].BI_tiempo t on p.id_tiempo = t.id_tiempo 
+WHERE p.id_sucursal IN 
+	(
+	SELECT TOP 3 p2.id_sucursal FROM [REJUNTESA].BI_pago p2
+	GROUP BY p2.id_sucursal
+	ORDER BY 
+	(
+	CASE p2.cuotas
+	WHEN 1 THEN 0
+	ELSE sum(p2.importe) END
+	) DESC
+	
+	)
+
+GROUP BY p.id_medio_pago, t.anio, t.mes, p.id_sucursal
+*/
+
+
+
