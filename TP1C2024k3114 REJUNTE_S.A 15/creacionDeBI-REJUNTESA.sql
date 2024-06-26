@@ -391,12 +391,12 @@ BEGIN
 END
 
 GO
-CREATE FUNCTION [REJUNTESA].calcular_edad(@fecha_nacimiento DATE)
+CREATE FUNCTION [REJUNTESA].calcular_edad(@fecha_nacimiento DATE, @fechaEdad datetime)
 RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
-    SET @edad = DATEDIFF(YEAR, @fecha_nacimiento, GETDATE());
+    SET @edad = DATEDIFF(YEAR, @fecha_nacimiento, @fechaEdad);
     RETURN @edad;
 END
 
@@ -413,24 +413,24 @@ BEGIN
 END
 
 GO
-CREATE FUNCTION [REJUNTESA].obtener_rango_etario_cliente(@id_cliente int)
+CREATE FUNCTION [REJUNTESA].obtener_rango_etario_cliente(@id_cliente int, @fechaEdad datetime)
 RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
-    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento)
+    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento, @fechaEdad)
     FROM [REJUNTESA].cliente
     WHERE id_cliente = @id_cliente;
     RETURN [REJUNTESA].obtener_rango_etario(@edad);
 END
 
 GO
-CREATE FUNCTION [REJUNTESA].obtener_rango_etario_empleado(@legajo_empleado int)
+CREATE FUNCTION [REJUNTESA].obtener_rango_etario_empleado(@legajo_empleado int, @fechaEdad datetime)
 RETURNS INT
 AS
 BEGIN
     DECLARE @edad INT;
-    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento)
+    SELECT @edad = [REJUNTESA].calcular_edad(nacimiento, @fechaEdad)
     FROM [REJUNTESA].empleado
     WHERE legajo_empleado = @legajo_empleado
     RETURN [REJUNTESA].obtener_rango_etario(@edad)
@@ -462,7 +462,7 @@ BEGIN
         MAX(v.descuento_promociones + v.descuento_medio) as descuento_total,
         MAX([REJUNTESA].obtener_turno(v.fecha)) as id_turno,
         SUM(pv.cantidad) as cantidad_unidades,
-        MAX([REJUNTESA].obtener_rango_etario_empleado(v.legajo_empleado)) as id_rango_empleado,
+        MAX([REJUNTESA].obtener_rango_etario_empleado(v.legajo_empleado, v.fecha)) as id_rango_empleado,
         c.id_tipo_caja
     FROM [REJUNTESA].venta v
     JOIN [REJUNTESA].sucursal s on s.id_sucursal = v.id_sucursal
@@ -515,18 +515,23 @@ BEGIN
     INSERT INTO [REJUNTESA].BI_envio (id_envio, fecha_cumplida, id_sucursal, id_tiempo, id_rango_cliente, id_ubicacion_destino, costo)
     SELECT 
         e.id_envio,
-        CASE 
-           WHEN fecha_entrega <= fecha_programada THEN 1 
-           ELSE 0 
-        END,
+        CASE
+            WHEN    -- Distinta fecha
+                CAST(fecha_programada as date) != CAST(fecha_entrega as date)
+                OR  -- Fecha bien, fuera de horario
+                (CAST(fecha_programada as date) = CAST(fecha_entrega as date)
+                AND (DATEPART(HOUR, fecha_entrega) > hora_rango_final
+                OR DATEPART(HOUR, fecha_entrega) < hora_rango_inicio)) THEN 0
+            ELSE 1
+        END as fecha_cumplida,
         v.id_sucursal,
         t.id_tiempo,
-        [REJUNTESA].obtener_rango_etario_cliente(c.id_cliente),
+        [REJUNTESA].obtener_rango_etario_cliente(c.id_cliente, v.fecha) as id_rango_cliente,
         c.id_localidad,
         e.costo
     FROM [REJUNTESA].envio e
     JOIN [REJUNTESA].venta v ON v.id_venta = e.id_venta
-    JOIN [REJUNTESA].cliente c ON e.id_cliente = c.dni
+    JOIN [REJUNTESA].cliente c ON e.id_cliente = c.id_cliente
     JOIN [REJUNTESA].sucursal s ON s.id_sucursal = v.id_sucursal
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(e.fecha_entrega) = t.mes AND YEAR(e.fecha_entrega) = t.anio
     IF @@ERROR != 0
@@ -549,7 +554,7 @@ BEGIN
         p.descuento_aplicado,
         v.id_sucursal, 
         CASE
-            WHEN dp.id_cliente IS NOT NULL THEN [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente)
+            WHEN dp.id_cliente IS NOT NULL THEN [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente, p.fecha_pago)
             ELSE NULL
         END,
         v.id_venta
@@ -608,8 +613,6 @@ EXEC REJUNTESA.migrar_BI_envio
 
 GO
 EXEC REJUNTESA.migrar_BI_pago
-
-SELECT * FROM [REJUNTESA].BI_pago
 
 /*
 -- Vistas
