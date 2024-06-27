@@ -853,6 +853,73 @@ GROUP BY u.id_localidad
 
 SELECT * FROM [REJUNTESA].BI_Localidades_Mayor_Costo_Envio
 
+/*
+10. Las 3 sucursales con el mayor importe de pagos en cuotas, según el medio de
+pago, mes y año. Se calcula sumando los importes totales de todas las ventas en
+cuotas.
+*/
+
+
+select TOP 3 
+S.nombre,
+T.anio,
+T.mes,
+P.id_medio_pago
+from [REJUNTESA].BI_sucursal S
+join [REJUNTESA].BI_pago P on P.id_sucursal = S.id_sucursal and P.cuotas > 1 
+join [REJUNTESA].BI_tiempo T on T.id_tiempo = P.id_tiempo
+group by S.nombre, S.id_sucursal, P.id_medio_pago, T.mes, T.anio
+order by sum(P.importe) desc
+
+
+
+-- OPCION 2 (PARA MI LA CORRECTA)
+SELECT 
+    nombre,
+    anio,
+    mes,
+    id_medio_pago
+FROM (
+    SELECT 
+        S.nombre,
+        T.anio,
+        T.mes,
+        P.id_medio_pago,
+        P.importe,
+        ROW_NUMBER() OVER (PARTITION BY T.anio, T.mes, P.id_medio_pago ORDER BY P.importe DESC) AS rn
+    FROM [REJUNTESA].BI_sucursal S
+    JOIN [REJUNTESA].BI_pago P ON P.id_sucursal = S.id_sucursal AND P.cuotas > 1
+    JOIN [REJUNTESA].BI_tiempo T ON T.id_tiempo = P.id_tiempo
+) AS TTOP
+WHERE rn <= 3
+ORDER BY anio, mes, id_medio_pago, rn;
+
+
+
+/*
+11. Promedio de importe de la cuota en función del rango etareo del cliente.
+*/
+
+select AVG(P.importe / P.cuotas) as 'Importe Cuota',
+RE.id_rango_etario as 'Rango Etareo'
+from [REJUNTESA].BI_pago P
+join [REJUNTESA].BI_Rango_Etario RE on P.id_rango_cliente = RE.id_rango_etario
+GROUP BY RE.id_rango_etario
+
+
+
+
+select * from [REJUNTESA].BI_Rango_Etario p
+
+
+/*
+12. Porcentaje de descuento aplicado por cada medio de pago en función del valor
+de total de pagos sin el descuento, por cuatrimestre. Es decir, total de descuentos
+sobre el total de pagos más el total de descuentos.
+*/
+
+
+
 --Las 3 sucursales con el mayor importe de pagos en cuotas, según el medio de
 --pago, mes y año. Se calcula sumando los importes totales de todas las ventas en
 --cuotas
@@ -884,4 +951,18 @@ GROUP BY p.id_medio_pago, t.anio, t.mes, p.id_sucursal
 */
 
 
-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
