@@ -578,7 +578,7 @@ SELECT
     v.id_ubicacion as Localidad,
     t.anio as Año,
     t.mes as Mes,
-    (SUM(v.total) / COUNT(v.id_venta)) AS [Promedio de ventas ($)]
+    AVG(v.total) AS [Promedio de ventas ($)]
 FROM [REJUNTESA].BI_venta v
 JOIN [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
 GROUP BY v.id_ubicacion, t.anio, t.mes;
@@ -631,33 +631,6 @@ SELECT
 from [REJUNTESA].BI_Venta v
 join [REJUNTESA].BI_tiempo t ON v.id_tiempo = t.id_tiempo
 GROUP BY t.anio, t.mes
-
-/*
-6 de Igna original
-
-GO
-CREATE VIEW [REJUNTESA].BI_Categorias_con_mayor_Descuento
-AS 
-SELECT
-    t.anio,
-    t.cuatrimestre,
-    c.categoria AS 'Categoria'
-FROM [REJUNTESA].BI_venta v
-JOIN [REJUNTESA].BI_tiempo t ON t.id_tiempo = v.id_tiempo
-JOIN [REJUNTESA].BI_producto_vendido pv ON pv.id_venta = v.id_venta
-JOIN [REJUNTESA].BI_categoria c ON pv.id_categoria = c.id_categoria
-where c.id_categoria in 
-	(SELECT  
-	TOP 3
-	 (c2.id_categoria)
-	FROM [REJUNTESA].BI_categoria c2
-	JOIN [REJUNTESA].BI_producto_vendido pv2 ON pv2.id_categoria = c2.id_categoria
-	JOIN [REJUNTESA].BI_venta v2 ON v2.id_venta = pv2.id_venta
-	JOIN [REJUNTESA].BI_tiempo t2 ON v2.id_tiempo = t2.id_tiempo
-	WHERE (t2.cuatrimestre = t.cuatrimestre and t2.anio = t.anio)
-	GROUP BY c2.id_categoria
-	ORDER BY  SUM(pv2.descuento_promo) DESC)
-GROUP BY  t.anio, t.cuatrimestre , c.categoria;*/
 
 GO -- 6
 CREATE VIEW [REJUNTESA].BI_Categorias_con_mayor_Descuento
@@ -713,10 +686,11 @@ SELECT
     t.anio as Año,
     t.mes as Mes,
     p.id_medio_pago as [Medio de pago],
-    ROW_NUMBER() over(PARTITION BY t.anio, t.mes, p.id_medio_pago ORDER BY SUM(CASE WHEN p.cuotas > 1 THEN p.importe ELSE 0 END) DESC) as Puesto,
+    ROW_NUMBER() over(PARTITION BY t.anio, t.mes, p.id_medio_pago ORDER BY SUM(p.importe) DESC) as Puesto,
     p.id_sucursal as [Sucursal]    
 FROM [REJUNTESA].BI_pago p
 JOIN [REJUNTESA].BI_tiempo t ON p.id_tiempo = t.id_tiempo
+WHERE cuotas > 1
 GROUP BY t.anio, t.mes, p.id_medio_pago, p.id_sucursal
 
 GO -- 11
@@ -724,8 +698,9 @@ CREATE VIEW [REJUNTESA].BI_Promedio_Importe_Cuota
 AS
 SELECT
     id_rango_cliente as [Rango etario de los clientes],
-    (SUM(CASE WHEN cuotas > 1 THEN importe ELSE 0 END) / SUM(CASE WHEN cuotas > 1 THEN 1 ELSE 0 END)) as [Promedio importe cuota ($)]
+    AVG(importe / cuotas) as [Promedio importe cuota ($)]
 FROM [REJUNTESA].BI_pago
+WHERE cuotas > 1
 GROUP BY id_rango_cliente
 
 GO -- 12
