@@ -369,7 +369,6 @@ BEGIN
     JOIN [REJUNTESA].producto_vendido pv ON v.id_venta = pv.id_venta
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(v.fecha) = t.mes AND YEAR(v.fecha) = t.anio
     GROUP BY
-        v.id_venta,
         s.id_localidad,
         t.id_tiempo,
         v.total,
@@ -390,11 +389,11 @@ BEGIN
         c.id_categoria,
         t.id_tiempo
 	from [REJUNTESA].producto_vendido pv
-	join [REJUNTESA].venta v on pv.id_venta = v.id_venta
+	JOIN [REJUNTESA].venta v ON pv.id_venta = v.id_venta
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(v.fecha) = t.mes AND YEAR(v.fecha) = t.anio
-	join [REJUNTESA].producto p on pv.id_producto = p.id_producto  
-	join [REJUNTESA].subcategoria sc on sc.id_subcategoria = p.id_subcategoria
-	join [REJUNTESA].categoria c on c.id_categoria = sc.id_categoria
+	JOIN [REJUNTESA].producto p ON pv.id_producto = p.id_producto  
+	JOIN [REJUNTESA].subcategoria sc ON sc.id_subcategoria = p.id_subcategoria
+	JOIN [REJUNTESA].categoria c ON c.id_categoria = sc.id_categoria
     LEFT JOIN [REJUNTESA].promocion_aplicada pa ON pv.id_venta = pa.id_venta AND pv.id_producto = pa.id_producto
     IF @@ERROR != 0
     PRINT('SP BI Producto Vendido FAIL!')
