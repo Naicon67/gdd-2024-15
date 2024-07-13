@@ -103,12 +103,13 @@ CREATE TABLE REJUNTESA.BI_producto_vendido (
 
 -- Crea tabla Envio
 CREATE TABLE REJUNTESA.BI_envio (
-    fecha_cumplida BIT,
+    fecha_cumplida INT,
+    cantidad_envios INT,
     id_sucursal INT,
     id_tiempo INT,
     id_rango_cliente INT,
     id_ubicacion_destino INT,
-    costo DECIMAL(18,2),
+    costo_promedio DECIMAL(18,2),
     CONSTRAINT [FK_id_sucursal_en_BI_envio.id_sucursal]
         FOREIGN KEY ([id_sucursal])
         REFERENCES [REJUNTESA].[BI_sucursal]([id_sucursal]),
@@ -385,7 +386,7 @@ AS
 BEGIN
     INSERT INTO [REJUNTESA].BI_producto_vendido (descuento_promo,id_categoria,id_tiempo)
 	SELECT 
-        isnull(pa.descuento_total,0),
+        SUM(pa.descuento_total),
         c.id_categoria,
         t.id_tiempo
 	from [REJUNTESA].producto_vendido pv
@@ -395,6 +396,10 @@ BEGIN
 	JOIN [REJUNTESA].subcategoria sc ON sc.id_subcategoria = p.id_subcategoria
 	JOIN [REJUNTESA].categoria c ON c.id_categoria = sc.id_categoria
     LEFT JOIN [REJUNTESA].promocion_aplicada pa ON pv.id_venta = pa.id_venta AND pv.id_producto = pa.id_producto
+    GROUP BY
+        c.id_categoria,
+        t.id_tiempo
+    ORDER BY id_tiempo, id_categoria
     IF @@ERROR != 0
     PRINT('SP BI Producto Vendido FAIL!')
     ELSE
@@ -406,27 +411,33 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_envio
 AS
 BEGIN
-    INSERT INTO [REJUNTESA].BI_envio (fecha_cumplida,id_sucursal,id_tiempo,id_rango_cliente,id_ubicacion_destino, costo)
-    SELECT 
-        CASE
-            WHEN    -- Distinta fecha
-                CAST(fecha_programada as date) != CAST(fecha_entrega as date)
-                OR  -- Fecha bien, fuera de horario
-                (CAST(fecha_programada as date) = CAST(fecha_entrega as date)
-                AND (DATEPART(HOUR, fecha_entrega) > hora_rango_final
-                OR DATEPART(HOUR, fecha_entrega) < hora_rango_inicio)) THEN 0
-            ELSE 1
-        END as fecha_cumplida,
+    INSERT INTO [REJUNTESA].BI_envio (fecha_cumplida,cantidad_envios,id_sucursal,id_tiempo,id_rango_cliente,id_ubicacion_destino, costo_promedio)
+    SELECT
+        SUM(CASE
+                WHEN    -- Distinta fecha
+                    CAST(fecha_programada as date) != CAST(fecha_entrega as date)
+                    OR  -- Fecha bien, fuera de horario
+                    (CAST(fecha_programada as date) = CAST(fecha_entrega as date)
+                    AND (DATEPART(HOUR, fecha_entrega) > hora_rango_final
+                    OR DATEPART(HOUR, fecha_entrega) < hora_rango_inicio)) THEN 0
+                ELSE 1
+        END) as fecha_cumplida,
+        COUNT(*) as cantidad_envios,
         v.id_sucursal,
         t.id_tiempo,
         [REJUNTESA].obtener_rango_etario_cliente(c.id_cliente, v.fecha) as id_rango_cliente,
         c.id_localidad,
-        e.costo
+        AVG(e.costo) as costo_promedio
     FROM [REJUNTESA].envio e
     JOIN [REJUNTESA].venta v ON v.id_venta = e.id_venta
     JOIN [REJUNTESA].cliente c ON e.id_cliente = c.id_cliente
     JOIN [REJUNTESA].sucursal s ON s.id_sucursal = v.id_sucursal
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(e.fecha_entrega) = t.mes AND YEAR(e.fecha_entrega) = t.anio
+    GROUP BY
+        v.id_sucursal,
+        t.id_tiempo,
+        [REJUNTESA].obtener_rango_etario_cliente(c.id_cliente, v.fecha),
+        c.id_localidad
     IF @@ERROR != 0
     PRINT('SP BI Envio FAIL!')
     ELSE
@@ -460,6 +471,7 @@ BEGIN
     PRINT('SP BI Pago OK!')
 END
 
+/*
 -- Vistas
 GO -- 1
 CREATE VIEW [REJUNTESA].BI_Ticket_Promedio_Mensual
