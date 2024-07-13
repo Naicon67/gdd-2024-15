@@ -596,7 +596,7 @@ CREATE VIEW [REJUNTESA].BI_Localidades_Mayor_Costo_Envio
 AS 
 SELECT
     e.id_ubicacion_destino as [Localidad destino],
-    ROW_NUMBER() over(ORDER BY AVG(e.costo_promedio) DESC) as Puesto
+    ROW_NUMBER() over(ORDER BY SUM(e.costo_promedio * e.cantidad_envios) / SUM(e.cantidad_envios) DESC) as Puesto
 FROM [REJUNTESA].BI_envio e
 GROUP BY e.id_ubicacion_destino
 
