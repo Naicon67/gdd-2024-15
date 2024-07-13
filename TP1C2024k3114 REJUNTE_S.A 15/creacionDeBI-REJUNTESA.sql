@@ -619,7 +619,7 @@ CREATE VIEW [REJUNTESA].BI_Promedio_Importe_Cuota
 AS
 SELECT
     id_rango_cliente as [Rango etario de los clientes],
-    1 as [Promedio importe cuota ($)]
+    SUM(importe_cuota_promedio * cantidad_pagos_cuotas) / SUM(cantidad_pagos_cuotas) as [Promedio importe cuota ($)]
 FROM [REJUNTESA].BI_pago
 GROUP BY id_rango_cliente
 
