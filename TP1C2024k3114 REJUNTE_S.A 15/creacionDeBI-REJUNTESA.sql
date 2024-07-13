@@ -103,8 +103,8 @@ CREATE TABLE REJUNTESA.BI_producto_vendido (
 
 -- Crea tabla Envio
 CREATE TABLE REJUNTESA.BI_envio (
-    fecha_cumplida INT,
-    cantidad_envios INT,
+    fecha_cumplida DECIMAL(18,2),
+    cantidad_envios DECIMAL(18,2),
     id_sucursal INT,
     id_tiempo INT,
     id_rango_cliente INT,
@@ -127,12 +127,14 @@ CREATE TABLE REJUNTESA.BI_envio (
 -- Crea tabla Pago
 CREATE TABLE REJUNTESA.BI_pago (
     id_medio_pago INT,
-    cuotas DECIMAL(18,0),
     id_tiempo INT,
-    importe DECIMAL(18,2),
-    descuento_medio DECIMAL(18,2),
     id_sucursal INT,
     id_rango_cliente INT,
+    cantidad_pagos_cuotas DECIMAL(18,2),
+    suma_importe_cuotas DECIMAL(18,2),
+    suma_importe_contado DECIMAL(18,2),
+    importe_cuota_promedio DECIMAL(18,2),
+    descuento_medio DECIMAL(18,2),
     CONSTRAINT [FK_id_sucursal_en_BI_pago.id_sucursal]
         FOREIGN KEY ([id_sucursal])
         REFERENCES [REJUNTESA].[BI_sucursal]([id_sucursal]),
@@ -310,7 +312,7 @@ BEGIN
     SELECT @id = id_rango_etario
     FROM [REJUNTESA].BI_rango_etario
     WHERE @edad BETWEEN edad_min AND edad_max;
-    RETURN isnull(@id,1);
+    RETURN isnull(@id,NULL);
 END
 
 GO
@@ -448,30 +450,48 @@ GO
 CREATE PROCEDURE [REJUNTESA].migrar_BI_pago
 AS
 BEGIN
-    INSERT INTO [REJUNTESA].BI_pago(id_medio_pago,cuotas,id_tiempo,importe,descuento_medio,id_sucursal,id_rango_cliente)
+    INSERT INTO [REJUNTESA].BI_pago(id_medio_pago,id_tiempo,id_sucursal,id_rango_cliente,cantidad_pagos_cuotas,suma_importe_cuotas,suma_importe_contado,importe_cuota_promedio,descuento_medio)
 	SELECT 
         p.id_medio_pago,
-        isnull(dp.cuotas, 1),
         t.id_tiempo,
-        p.importe,
-        p.descuento_aplicado,
         v.id_sucursal, 
-        CASE
-            WHEN dp.id_cliente IS NOT NULL THEN [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente, p.fecha_pago)
-            ELSE NULL
-        END
-	FROM [REJUNTESA].pago p
-	JOIN [REJUNTESA].medio_pago mp on mp.id_medio_pago = p.id_medio_pago
-	JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
-	LEFT JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
+        [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente, p.fecha_pago) as id_rango_cliente,
+        SUM(CASE WHEN dp.cuotas is not null AND dp.cuotas > 1 THEN 1 ELSE 0 END) as cantidad_pagos_cuotas,
+        SUM(CASE
+                WHEN dp.cuotas is not null AND dp.cuotas > 1 THEN p.importe
+                ELSE 0
+        END) as suma_importe_cuotas,
+        SUM(CASE
+                WHEN dp.cuotas is null OR dp.cuotas <= 1 THEN p.importe
+                ELSE 0
+        END) as suma_importe_contado,
+        (SUM(CASE
+                WHEN dp.cuotas is not null AND dp.cuotas > 1 THEN p.importe / dp.cuotas
+                ELSE 0
+        END)
+                /
+        (CASE
+            WHEN SUM(CASE WHEN dp.cuotas is not null AND dp.cuotas > 1 THEN 1 ELSE 0 END) = 0 THEN 1
+            ELSE SUM(CASE WHEN dp.cuotas is not null AND dp.cuotas > 1 THEN 1 ELSE 0 END)
+        END)) as importe_cuota_promedio,
+        SUM(p.descuento_aplicado) as descuento_medio
+    FROM [REJUNTESA].pago p
+    JOIN [REJUNTESA].medio_pago mp on mp.id_medio_pago = p.id_medio_pago
+    JOIN [REJUNTESA].venta v ON v.id_venta = p.id_venta
+    LEFT JOIN [REJUNTESA].detalle_pago dp on dp.id_detalle_pago = p.id_detalle_pago
     JOIN [REJUNTESA].BI_tiempo t ON MONTH(p.fecha_pago) = t.mes AND YEAR(p.fecha_pago) = t.anio
+    GROUP BY
+        p.id_medio_pago,
+        t.id_tiempo,
+        v.id_sucursal,
+        [REJUNTESA].obtener_rango_etario_cliente(dp.id_cliente, p.fecha_pago)
     IF @@ERROR != 0
     PRINT('SP BI Pago FAIL!')
     ELSE
     PRINT('SP BI Pago OK!')
 END
 
-/*
+
 -- Vistas
 GO -- 1
 CREATE VIEW [REJUNTESA].BI_Ticket_Promedio_Mensual
@@ -553,10 +573,10 @@ SELECT
     t.anio AS Año,
     t.mes AS Mes,
     e.id_sucursal AS Sucursal,
-    ROUND(100*(SUM(CAST(e.fecha_cumplida as decimal(18,2)))/COUNT(*)), 4) as [Porcentaje cumplimiento (%)]
+    ROUND(100 * SUM(e.fecha_cumplida) / SUM(e.cantidad_envios), 4) as [Porcentaje cumplimiento (%)]
 FROM [REJUNTESA].BI_envio e
 JOIN [REJUNTESA].BI_tiempo t on e.id_tiempo = t.id_tiempo
-GROUP BY  t.anio, t.mes, e.id_sucursal
+GROUP BY t.anio, t.mes, e.id_sucursal
 
 GO -- 8
 CREATE VIEW [REJUNTESA].BI_Envios_Rango_Etario
@@ -565,7 +585,7 @@ SELECT
     t.anio AS Año, 
     t.cuatrimestre AS Cuatrimestre,
     e.id_rango_cliente AS [Rango etario de los clientes],
-    COUNT(*) AS [Cantidad de envíos]
+    SUM(e.cantidad_envios) AS [Cantidad de envíos]
 FROM [REJUNTESA].BI_envio e
 JOIN [REJUNTESA].BI_tiempo t ON e.id_tiempo = t.id_tiempo
 JOIN [REJUNTESA].BI_rango_etario re ON re.id_rango_etario = e.id_rango_cliente
@@ -576,7 +596,7 @@ CREATE VIEW [REJUNTESA].BI_Localidades_Mayor_Costo_Envio
 AS 
 SELECT
     e.id_ubicacion_destino as [Localidad destino],
-    ROW_NUMBER() over(ORDER BY AVG(e.costo) DESC) as Puesto
+    ROW_NUMBER() over(ORDER BY AVG(e.costo_promedio) DESC) as Puesto
 FROM [REJUNTESA].BI_envio e
 GROUP BY e.id_ubicacion_destino
 
@@ -587,11 +607,11 @@ SELECT
     t.anio as Año,
     t.mes as Mes,
     p.id_medio_pago as [Medio de pago],
-    ROW_NUMBER() over(PARTITION BY t.anio, t.mes, p.id_medio_pago ORDER BY SUM(p.importe) DESC) as Puesto,
+    ROW_NUMBER() over(PARTITION BY t.anio, t.mes, p.id_medio_pago ORDER BY SUM(p.suma_importe_cuotas) DESC) as Puesto,
     p.id_sucursal as [Sucursal]    
 FROM [REJUNTESA].BI_pago p
 JOIN [REJUNTESA].BI_tiempo t ON p.id_tiempo = t.id_tiempo
-WHERE cuotas > 1
+WHERE p.suma_importe_cuotas > 0
 GROUP BY t.anio, t.mes, p.id_medio_pago, p.id_sucursal
 
 GO -- 11
@@ -599,9 +619,8 @@ CREATE VIEW [REJUNTESA].BI_Promedio_Importe_Cuota
 AS
 SELECT
     id_rango_cliente as [Rango etario de los clientes],
-    AVG(importe / cuotas) as [Promedio importe cuota ($)]
+    1 as [Promedio importe cuota ($)]
 FROM [REJUNTESA].BI_pago
-WHERE cuotas > 1
 GROUP BY id_rango_cliente
 
 GO -- 12
@@ -611,7 +630,7 @@ SELECT
     t.anio as Año,
     t.cuatrimestre as Cuatrimestre, 
     p.id_medio_pago as [Medio de pago],
-    ROUND(100*(SUM(p.descuento_medio)/(SUM(p.importe)+SUM(p.descuento_medio))), 4) as [Porcentaje de descuento (%)]
+    ROUND(100 * (SUM(p.descuento_medio)/(SUM(p.suma_importe_cuotas)+SUM(p.suma_importe_contado)+SUM(p.descuento_medio))), 4) as [Porcentaje de descuento (%)]
 FROM [REJUNTESA].BI_pago p
 JOIN [REJUNTESA].BI_tiempo t ON p.id_tiempo = t.id_tiempo
 GROUP BY t.anio, t.cuatrimestre, p.id_medio_pago
